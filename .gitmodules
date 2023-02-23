@@ -1,0 +1,3 @@
+[submodule "core-menu"]
+	path = core-menu
+	url = https://github.com/electrikjesus/easy-menu-system.git
