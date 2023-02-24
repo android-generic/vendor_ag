@@ -9,6 +9,7 @@ ag_vendor_path="$SCRIPT_PATH"
 export ag_vendor_path="$ag_vendor_path"
 temp_path="$ag_vendor_path/tmp"
 export temp_path="$ag_vendor_path/tmp"
+mkdir -p $temp_path
 
 targetspath="$ag_vendor_path/targets"
 export targetspath="$ag_vendor_path/targets"
@@ -69,13 +70,13 @@ echo -e "CURRENT_BSP_TYPE: $CURRENT_BSP_TYPE"
 # Figure out targets or ask if not found
 CURRENT_TARGET_TYPE=""
 # Look for Android-x86 bits
-if [[ -d "$rompath/external/kernel-drivers" ]] && [[ -d "$rompath/external/mesa" ]] \
-  && [[ -d "$rompath/bootable/newinstaller" ]]; then
-  CURRENT_TARGET_TYPE="pc"
-# Look for Waydroid bits
-elif [[ -d "$rompath/device/waydroid" ]]; then
-  CURRENT_TARGET_TYPE="waydroid"
-fi
+# if [[ -d "$rompath/external/kernel-drivers" ]] && [[ -d "$rompath/external/mesa" ]] \
+#   && [[ -d "$rompath/bootable/newinstaller" ]]; then
+#   CURRENT_TARGET_TYPE="pc"
+# # Look for Waydroid bits
+# elif [[ -d "$rompath/device/waydroid" ]]; then
+#   CURRENT_TARGET_TYPE="waydroid"
+# fi
 if [ "$CURRENT_TARGET_TYPE" == "" ]; then
   preTargetsString=()
   # We will only want to present targets that are available for the current API
@@ -87,20 +88,28 @@ if [ "$CURRENT_TARGET_TYPE" == "" ]; then
   echo -e "preTargetsString: $preTargetsString"
   targetsStringArray=($preTargetsString)
   for t in $preTargetsString; do
+    export CURRENT_TARGET_PATH="$targetspath/$t"
+
+    tstring_ok="false"
     if [ -d "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
-      targetsString="$targetsString $t"
+      tstring_ok="true"
       echo "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION" > $temp_path/$t-manifest.cfg
       export CURRENT_${t}_MANIFEST_PATH="$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION"
-    else
-      echo "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION was not found"
+    fi
+    if [ -d "$targetspath/$t/scripts/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
+      tstring_ok="true"
+      export CURRENT_${t}_SCRIPTS_PATH="$targetspath/$t/scripts/api-$CURRENT_PLATFORM_SDK_VERSION"
     fi
     if [ -d "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
+      tstring_ok="true"
       echo "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" > $temp_path/$t-patches.cfg
       export CURRENT_${t}_PATCHES_PATH="$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION"
-      export CURRENT_TARGET_PATH="$targetspath/$t"
-      # export CURRENT_${t}_MENU_PATH="$targetspath/$t/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json"
+    fi
+    
+    if [ "$tstring_ok" == "true" ]; then
+      targetsString="$targetsString $t"
     else
-      echo "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION was not found"
+      echo "No compatible components found in $targetspath/$t/ for api-$CURRENT_PLATFORM_SDK_VERSION"
     fi
   done
   echo -e "targetsString: $targetsString"

@@ -36,7 +36,7 @@ echo -e "ag_vendor_path: $ag_vendor_path"
 echo -e "temp_path: $temp_path"
 echo -e "targetspath: $targetspath"
 echo -e "CURRENT_pc_MANIFEST_PATH: $CURRENT_pc_MANIFEST_PATH"
-manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
+# manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
 base_manifests_path="$CURRENT_pc_MANIFEST_PATH"
 echo -e "CURRENT_pc_PATCHES_PATH: $CURRENT_pc_PATCHES_PATH"
 echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
@@ -57,62 +57,57 @@ for m in $preManifestsString; do
 done
 echo -e "manifestsString: $manifestsString"
 
+ok_message "Please choose from available base types on the next screen."
 while :
 do
-menu $manifestsString
-answer=$(0< "${dir_tmp}/${file_tmp}" )
-#
-for i in $manifestsString ; do
-    if [ "${answer}" = "${i}" ]; then
-    notify_message "Selected \"${i}\" ..."
-    notify_change "${i}"			
-    manifests_path="$base_manifests_path/${i}"
-    fi
-done
-if [ "${answer}" = "" ]; then
-    exit
-fi
-done
+    menu $manifestsString
+    answer=$(0< "${dir_tmp}/${file_tmp}" )
+    #
+    echo -e "answer: ${answer}"
+    for ms in $manifestsString ; do
+        echo -e "ms: $ms"
+        if [ "*${answer}*" = "*${ms}*" ]; then
+        notify_message "Selected \"${ms}\" ..."
+        # notify_change "${i}"
+        manifests_path="$base_manifests_path/${ms}"
+        echo -e "manifests_path: $manifests_path"
+        
+        echo -e ${reset}""${reset}
+        echo -e ${green}"Placing manifest fragments..."${reset}
+        echo -e ${reset}""${reset}
+        cp -fpr ${manifests_path}/*.xml "${loc_man}/"
 
-echo -e ${reset}""${reset}
-echo -e ${green}"Placing manifest fragments..."${reset}
-echo -e ${reset}""${reset}
-if [ -d "${manifests_path}" ]; then
-    cp -fpr ${manifests_path}/*.xml "${loc_man}/"
-else
-    echo -e ${reset}""${reset}
-    echo -e ${ltblue}"INFO: Manifests not found, downloading"${reset}
-    echo -e ${reset}""${reset}
-    wget "${manifests_url}/00-remotes.xml" -O "${loc_man}/00-remotes.xml"
-    wget "${manifests_url}/01-removes.xml" -O "${loc_man}/01-removes.xml"
-    wget "${manifests_url}/02-android-x86.xml" -O "${loc_man}/02-android-x86.xml"
-    wget "${manifests_url}/03-device.xml" -O "${loc_man}/03-device.xml"
-    wget "${manifests_url}/04-kernel.xml" -O "${loc_man}/04-kernel.xml"
-    wget "${manifests_url}/05-extras.xml" -O "${loc_man}/05-extras.xml"
-    wget "${manifests_url}/05-extras.xml" -O "${loc_man}/05-extras.xml"
-fi
-
-echo -e ${reset}""${reset}
-echo -e ${teal}"INFO: Cleaning up remove manifest entries"${reset}
-echo -e ${reset}""${reset}
-while IFS= read -r rpitem; do
-    if [[ $rpitem == *"remove-project"* ]]; then
-        rpitem_trimmed="$(echo "$rpitem" | xargs)"
-        if grep -qRlZ "$rpitem_trimmed" "${top_dir}/.repo/manifests/"; then
-            echo -e ${yellow}"WARN: ROM already includes: $rpitem"${reset}
-        else
-            echo -e ${green}"INFO: Needed: $rpitem"${reset}
-            prefix="<remove-project name="
-            suffix=" />"
-            item=${rpitem_trimmed#"$prefix"}
-            item=${item%"$suffix"}
-            if ! grep -qRlZ "$item" "${top_dir}/.repo/manifests/"; then
-                sed -e "$item"'d' "${loc_man}/01-removes.xml"
+        echo -e ${reset}""${reset}
+        echo -e ${teal}"INFO: Cleaning up remove manifest entries"${reset}
+        echo -e ${reset}""${reset}
+        while IFS= read -r rpitem; do
+            if [[ $rpitem == *"remove-project"* ]]; then
+                rpitem_trimmed="$(echo "$rpitem" | xargs)"
+                if grep -qRlZ "$rpitem_trimmed" "${top_dir}/.repo/manifests/"; then
+                    echo -e ${yellow}"WARN: ROM already includes: $rpitem"${reset}
+                else
+                    echo -e ${green}"INFO: Needed: $rpitem"${reset}
+                    prefix="<remove-project name="
+                    suffix=" />"
+                    item=${rpitem_trimmed#"$prefix"}
+                    item=${item%"$suffix"}
+                    if ! grep -qRlZ "$item" "${top_dir}/.repo/manifests/"; then
+                        sed -e "$item"'d' "${loc_man}/01-removes.xml"
+                    fi
+                fi
             fi
-        fi
-    fi
-done < "${loc_man}/01-removes.xml"
+        done < "${loc_man}/01-removes.xml"
 
-echo -e ${reset}""${reset}
-echo -e ${green}"Manifest generation complete. Files have been copied to $rompath/.repo/local_manifests/"${reset}
-echo -e ${reset}""${reset}
+        echo -e ${reset}""${reset}
+        echo -e ${green}"Manifest generation complete. Files have been copied to $rompath/.repo/local_manifests/"${reset}
+        echo -e ${reset}""${reset}
+
+        [[ $_ != $0 ]] && exit 0 2>/dev/null || return 0 2>/dev/null;
+        fi
+    done
+    if [ "${answer}" = "" ]; then
+        exit
+    fi
+done
+
+
