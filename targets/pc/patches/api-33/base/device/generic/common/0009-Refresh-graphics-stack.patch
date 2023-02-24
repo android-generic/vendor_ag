@@ -1,0 +1,164 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@lincor.com>
+Date: Thu, 21 Oct 2021 21:19:02 +0200
+Subject: [PATCH 09/11] Refresh graphics stack
+
+- mesa3d 22.3.0-dev (mainline, built with meson)
+- drm_hwcomposer (GloDroid)
+- minigbm_intel (GloDroid)
+- gralloc4/mapper4
+
+The minigbm_intel gralloc contains all the dumb/generic and
+i915-specific drivers.
+
+Mesa3d is not compiled with support for radeonsi. This saves an
+additional dependency on LLVM.
+---
+ BoardConfig.mk  |  6 ++++--
+ gpu/gpu_mesa.mk |  8 +++++---
+ init.sh         | 34 ++++++++--------------------------
+ manifest.xml    | 18 ------------------
+ treble.mk       |  6 +++---
+ 5 files changed, 20 insertions(+), 52 deletions(-)
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index b0f4ca5..796d551 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -70,8 +70,10 @@ SUPERUSER_PACKAGE_PREFIX := com.android.settings.cyanogenmod.superuser
+ BOARD_WPA_SUPPLICANT_DRIVER ?= NL80211
+ WPA_SUPPLICANT_VERSION ?= VER_2_1_DEVEL
+ 
+-BOARD_GPU_DRIVERS ?= i915 i965 iris nouveau r300g r600g radeonsi virgl vmwgfx
+-ifneq ($(strip $(BOARD_GPU_DRIVERS)),)
++BOARD_MESA3D_USES_MESON_BUILD := true
++BOARD_MESA3D_BUILD_LIBGBM := true
++BOARD_MESA3D_GALLIUM_DRIVERS ?= i915 iris crocus nouveau r300 r600 virgl
++ifneq ($(strip $(BOARD_MESA3D_GALLIUM_DRIVERS)),)
+ TARGET_HARDWARE_3D := true
+ endif
+ 
+diff --git a/gpu/gpu_mesa.mk b/gpu/gpu_mesa.mk
+index fd42e93..f971137 100644
+--- a/gpu/gpu_mesa.mk
++++ b/gpu/gpu_mesa.mk
+@@ -10,9 +10,11 @@
+ 
+ PRODUCT_PACKAGES := \
+     amdgpu.ids \
+-    hwcomposer.drm hwcomposer.drm_minigbm \
+-    gralloc.gbm gralloc.minigbm \
+-    libGLES_mesa    \
++    libEGL_mesa \
++    libGLESv1_CM_mesa \
++    libGLESv2_mesa \
++    libgallium_dri \
++    libglapi \
+     libtxc_dxtn     \
+ 
+ PRODUCT_PACKAGES += \
+diff --git a/init.sh b/init.sh
+index b46eadc..18ddcbf 100644
+--- a/init.sh
++++ b/init.sh
+@@ -182,37 +182,19 @@ function init_uvesafb()
+ 
+ function init_hal_gralloc()
+ {
+-	[ "$VULKAN" = "1" ] && GRALLOC=gbm
+-
+-	case "$(readlink /sys/class/graphics/fb0/device/driver)" in
+-		*virtio_gpu)
+-			HWC=${HWC:-drm}
+-			GRALLOC=${GRALLOC:-gbm}
+-			video=${video:-1280x768}
+-			;&
+-		*i915|*radeon|*nouveau|*vmwgfx|*amdgpu)
+-			if [ "$HWACCEL" != "0" ]; then
+-				${HWC:+set_property ro.hardware.hwcomposer $HWC}
+-				set_property ro.hardware.gralloc ${GRALLOC:-gbm}
+-				set_drm_mode
+-			fi
+-			;;
+-		"")
+-			init_uvesafb
+-			;&
+-		*)
+-			;;
+-	esac
+-
+-	[ -z "$(getprop ro.hardware.gralloc)" ] && set_property ro.hardware.egl swiftshader
++	set_property ro.hardware.gralloc minigbm_intel
++	set_property ro.hardware.hwcomposer drm
++	if [ "$HWACCEL" == "0" ]; then
++		set_property ro.hardware.egl swiftshader
++	else
++		set_drm_mode
++		set_property ro.hardware.egl mesa
++	fi
+ 	[ -n "$DEBUG" ] && set_property debug.egl.trace error
+ }
+ 
+ function init_hal_hwcomposer()
+ {
+-	# TODO
+-	[ "$HWC" = "drmfb" ] && start vendor.hwcomposer-2-1.drmfb
+-	return
+ }
+ 
+ function init_hal_vulkan()
+diff --git a/manifest.xml b/manifest.xml
+index 7a79a90..ea2b8f6 100644
+--- a/manifest.xml
++++ b/manifest.xml
+@@ -62,15 +62,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.allocator</name>
+-        <transport>hwbinder</transport>
+-        <version>2.0</version>
+-        <interface>
+-            <name>IAllocator</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.graphics.composer</name>
+         <transport>hwbinder</transport>
+@@ -80,15 +71,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.mapper</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <version>2.0</version>
+-        <interface>
+-            <name>IMapper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.light</name>
+         <transport>hwbinder</transport>
+diff --git a/treble.mk b/treble.mk
+index 6bcff2e..f61c9c5 100644
+--- a/treble.mk
++++ b/treble.mk
+@@ -1,11 +1,11 @@
+ # Graphics HAL
+ PRODUCT_PACKAGES += \
+-    android.hardware.graphics.mapper@2.0-impl \
+-    android.hardware.graphics.allocator@2.0-impl \
+-    android.hardware.graphics.allocator@2.0-service \
++    android.hardware.graphics.allocator@4.0-service.minigbm_intel \
++    android.hardware.graphics.mapper@4.0-impl.minigbm_intel
+ 
+ # HWComposer HAL
+ PRODUCT_PACKAGES += \
++    hwcomposer.drm \
+     android.hardware.graphics.composer@2.4-service \
+     android.hardware.graphics.composer@2.1-service.drmfb
+ 

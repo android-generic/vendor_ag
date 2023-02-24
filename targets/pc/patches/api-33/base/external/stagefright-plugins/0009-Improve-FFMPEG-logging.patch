@@ -1,0 +1,102 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@lincor.com>
+Date: Thu, 3 Jun 2021 18:57:51 -0400
+Subject: [PATCH 09/13] Improve FFMPEG logging
+
+Move a few debug statement to DEBUG level (instead of INFO or VERBOSE).
+Only print decoding error on the first occurrence, to avoid an avalanche
+of log lines in case of problems.
+---
+ omx/SoftFFmpegVideo.cpp | 23 +++++++++++++++--------
+ omx/SoftFFmpegVideo.h   |  1 +
+ 2 files changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/omx/SoftFFmpegVideo.cpp b/omx/SoftFFmpegVideo.cpp
+index d9f673a..a465375 100644
+--- a/omx/SoftFFmpegVideo.cpp
++++ b/omx/SoftFFmpegVideo.cpp
+@@ -82,7 +82,8 @@ SoftFFmpegVideo::SoftFFmpegVideo(
+       mExtradataReady(false),
+       mIgnoreExtradata(false),
+       mStride(320),
+-      mSignalledError(false) {
++      mSignalledError(false),
++      mLoggedError(0) {
+ 
+     ALOGD("SoftFFmpegVideo component: %s codingType=%d appData: %p", name, codingType, appData);
+ 
+@@ -374,7 +375,7 @@ int32_t SoftFFmpegVideo::handleExtradata() {
+     OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
+ 
+ #if DEBUG_EXTRADATA
+-    ALOGI("got extradata, ignore: %d, size: %u",
++    ALOGD("got extradata, ignore: %d, size: %u",
+             mIgnoreExtradata, inHeader->nFilledLen);
+     hexdump(inHeader->pBuffer + inHeader->nOffset, inHeader->nFilledLen);
+ #endif
+@@ -417,7 +418,7 @@ int32_t SoftFFmpegVideo::openDecoder() {
+ 
+     if (!mExtradataReady) {
+ #if DEBUG_EXTRADATA
+-        ALOGI("extradata is ready, size: %d", mCtx->extradata_size);
++        ALOGD("extradata is ready, size: %d", mCtx->extradata_size);
+         hexdump(mCtx->extradata, mCtx->extradata_size);
+ #endif
+         mExtradataReady = true;
+@@ -471,9 +472,9 @@ void SoftFFmpegVideo::initPacket(AVPacket *pkt,
+ #if DEBUG_PKT
+     if (pkt->pts != AV_NOPTS_VALUE)
+     {
+-        ALOGV("pkt size:%d, pts:%lld", pkt->size, pkt->pts);
++        ALOGD("pkt size:%d, pts:%lld", pkt->size, pkt->pts);
+     } else {
+-        ALOGV("pkt size:%d, pts:N/A", pkt->size);
++        ALOGD("pkt size:%d, pts:N/A", pkt->size);
+     }
+ #endif
+ }
+@@ -525,7 +526,10 @@ int32_t SoftFFmpegVideo::decodeVideo() {
+     }
+ 
+     if (err < 0) {
+-        ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);
++        if ((mLoggedError & 0x01) == 0) {
++            ALOGE("ffmpeg video decoder failed to decode frame (logged only once). (%d)", err);
++            mLoggedError |= 0x01;
++        }
+         //don't send error to OMXCodec, skip!
+         ret = ERR_NO_FRM;
+     } else {
+@@ -542,7 +546,10 @@ int32_t SoftFFmpegVideo::decodeVideo() {
+         } else {
+             err = ffmpeg_hwaccel_get_frame(mCtx, mFrame);
+             if (err < 0) {
+-                ALOGE("ffmpeg HW video decoder failed to decode frame. (%d)", err);
++                if ((mLoggedError & 0x02) == 0) {
++                    ALOGE("ffmpeg HW video decoder failed to decode frame (logged only once). (%d)", err);
++                    mLoggedError |= 0x02;
++                }
+                 //don't send error to OMXCodec, skip!
+                 ret = ERR_NO_FRM;
+             } else {
+@@ -631,7 +638,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
+     outHeader->nTimeStamp = pts; //FIXME pts is right???
+ 
+ #if DEBUG_FRM
+-    ALOGV("mFrame pkt_pts: %lld pkt_dts: %lld used %lld", mFrame->pkt_pts, mFrame->pkt_dts, pts);
++    ALOGD("mFrame pkt_pts: %lld pkt_dts: %lld used %lld", mFrame->pkt_pts, mFrame->pkt_dts, pts);
+ #endif
+ 
+     outQueue.erase(outQueue.begin());
+diff --git a/omx/SoftFFmpegVideo.h b/omx/SoftFFmpegVideo.h
+index a931a22..78b1f8d 100644
+--- a/omx/SoftFFmpegVideo.h
++++ b/omx/SoftFFmpegVideo.h
+@@ -95,6 +95,7 @@ private:
+     int32_t mOutputHeight;
+ 
+     bool mSignalledError;
++    int mLoggedError;
+ 
+     void     initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE *def);
+     void     getInputFormat(uint32_t mode, OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams);

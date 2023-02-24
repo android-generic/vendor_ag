@@ -1,0 +1,514 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Wed, 5 Oct 2022 13:49:18 +0200
+Subject: [PATCH 07/13] Update to FFMPEG 4.4.2
+
+Remove use of deprecated API:
+- drop av_codec_registerall/av_register_all
+- drop av_lockmgr_register (threading support is compiled in)
+- use av_packet_alloc instead of av_init_packet
+- use internal/opaque packet list/queue instead of AVPacketList
+---
+ extractor/FFmpegExtractor.cpp |  34 ++++++------
+ extractor/FFmpegExtractor.h   |   4 +-
+ omx/SoftFFmpegAudio.cpp       |  22 +++++---
+ omx/SoftFFmpegAudio.h         |   1 +
+ omx/SoftFFmpegVideo.cpp       |  22 +++++---
+ omx/SoftFFmpegVideo.h         |   1 +
+ utils/ffmpeg_utils.cpp        | 101 +++++++++++++++++-----------------
+ utils/ffmpeg_utils.h          |  16 ++----
+ 8 files changed, 107 insertions(+), 94 deletions(-)
+
+diff --git a/extractor/FFmpegExtractor.cpp b/extractor/FFmpegExtractor.cpp
+index a46f87c..74aba4a 100644
+--- a/extractor/FFmpegExtractor.cpp
++++ b/extractor/FFmpegExtractor.cpp
+@@ -113,6 +113,8 @@ private:
+ 
+ FFmpegExtractor::FFmpegExtractor(DataSourceHelper *source, const sp<AMessage> &meta)
+     : mDataSource(source),
++      mAudioQ(NULL),
++      mVideoQ(NULL),
+       mFormatCtx(NULL),
+       mParsedMetadata(false) {
+     ALOGV("FFmpegExtractor::FFmpegExtractor");
+@@ -120,8 +122,8 @@ FFmpegExtractor::FFmpegExtractor(DataSourceHelper *source, const sp<AMessage> &m
+     mMeta = AMediaFormat_new();
+     fetchStuffsFromSniffedMeta(meta);
+ 
+-    packet_queue_init(&mVideoQ);
+-    packet_queue_init(&mAudioQ);
++    mVideoQ = packet_queue_alloc();
++    mAudioQ = packet_queue_alloc();
+ 
+     int err = initStreams();
+     if (err < 0) {
+@@ -160,8 +162,8 @@ FFmpegExtractor::~FFmpegExtractor() {
+ 
+     Mutex::Autolock autoLock(mLock);
+ 
+-    packet_queue_destroy(&mVideoQ);
+-    packet_queue_destroy(&mAudioQ);
++    packet_queue_free(&mVideoQ);
++    packet_queue_free(&mAudioQ);
+ 
+     for (auto& trackInfo : mTracks) {
+         AMediaFormat_delete(trackInfo.mMeta);
+@@ -654,7 +656,7 @@ int FFmpegExtractor::streamComponentOpen(int streamIndex)
+                 // disable the stream
+                 mVideoStreamIdx = -1;
+                 mVideoStream = NULL;
+-                packet_queue_flush(&mVideoQ);
++                packet_queue_flush(mVideoQ);
+                 mFormatCtx->streams[streamIndex]->discard = AVDISCARD_ALL;
+             }
+             return ret;
+@@ -678,7 +680,7 @@ int FFmpegExtractor::streamComponentOpen(int streamIndex)
+         trackInfo->mIndex  = streamIndex;
+         trackInfo->mMeta   = meta;
+         trackInfo->mStream = mVideoStream;
+-        trackInfo->mQueue  = &mVideoQ;
++        trackInfo->mQueue  = mVideoQ;
+         trackInfo->mSeek   = false;
+ 
+         mDefersToCreateVideoTrack = false;
+@@ -696,7 +698,7 @@ int FFmpegExtractor::streamComponentOpen(int streamIndex)
+                 // disable the stream
+                 mAudioStreamIdx = -1;
+                 mAudioStream = NULL;
+-                packet_queue_flush(&mAudioQ);
++                packet_queue_flush(mAudioQ);
+                 mFormatCtx->streams[streamIndex]->discard = AVDISCARD_ALL;
+             }
+             return ret;
+@@ -720,7 +722,7 @@ int FFmpegExtractor::streamComponentOpen(int streamIndex)
+         trackInfo->mIndex  = streamIndex;
+         trackInfo->mMeta   = meta;
+         trackInfo->mStream = mAudioStream;
+-        trackInfo->mQueue  = &mAudioQ;
++        trackInfo->mQueue  = mAudioQ;
+         trackInfo->mSeek   = false;
+ 
+         mDefersToCreateAudioTrack = false;
+@@ -753,15 +755,15 @@ void FFmpegExtractor::streamComponentClose(int streamIndex)
+     switch (avpar->codec_type) {
+     case AVMEDIA_TYPE_VIDEO:
+         ALOGV("[%s] packet_queue_abort", type);
+-        packet_queue_abort(&mVideoQ);
++        packet_queue_abort(mVideoQ);
+         ALOGV("[%s] packet_queue_end", type);
+-        packet_queue_flush(&mVideoQ);
++        packet_queue_flush(mVideoQ);
+         break;
+     case AVMEDIA_TYPE_AUDIO:
+         ALOGV("[%s] packet_queue_abort", type);
+-        packet_queue_abort(&mAudioQ);
++        packet_queue_abort(mAudioQ);
+         ALOGV("[%s] packet_queue_end", type);
+-        packet_queue_flush(&mAudioQ);
++        packet_queue_flush(mAudioQ);
+         break;
+     case AVMEDIA_TYPE_SUBTITLE:
+         break;
+@@ -1019,13 +1021,13 @@ int FFmpegExtractor::initStreams()
+     if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
+         audio_ret = streamComponentOpen(st_index[AVMEDIA_TYPE_AUDIO]);
+         if (audio_ret >= 0)
+-            packet_queue_start(&mAudioQ);
++            packet_queue_start(mAudioQ);
+     }
+ 
+     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
+         video_ret = streamComponentOpen(st_index[AVMEDIA_TYPE_VIDEO]);
+         if (video_ret >= 0)
+-            packet_queue_start(&mVideoQ);
++            packet_queue_start(mVideoQ);
+     }
+ 
+     if (audio_ret < 0 && video_ret < 0) {
+@@ -1162,10 +1164,10 @@ int FFmpegExtractor::feedNextPacket() {
+     // Queue frame
+ 
+     if (pkt->stream_index == mVideoStreamIdx) {
+-        packet_queue_put(&mVideoQ, pkt);
++        packet_queue_put(mVideoQ, pkt);
+         return mVideoStreamIdx;
+     } else if (pkt->stream_index == mAudioStreamIdx) {
+-        packet_queue_put(&mAudioQ, pkt);
++        packet_queue_put(mAudioQ, pkt);
+         return mAudioStreamIdx;
+     } else {
+         av_packet_unref(pkt);
+diff --git a/extractor/FFmpegExtractor.h b/extractor/FFmpegExtractor.h
+index f0ab046..cb965bb 100644
+--- a/extractor/FFmpegExtractor.h
++++ b/extractor/FFmpegExtractor.h
+@@ -78,8 +78,8 @@ private:
+     size_t mPktCounter;
+     int mAbortRequest;
+ 
+-    PacketQueue mAudioQ;
+-    PacketQueue mVideoQ;
++    PacketQueue *mAudioQ;
++    PacketQueue *mVideoQ;
+ 
+     AVFormatContext *mFormatCtx;
+     int mVideoStreamIdx;
+diff --git a/omx/SoftFFmpegAudio.cpp b/omx/SoftFFmpegAudio.cpp
+index 86704ce..535c9ee 100644
+--- a/omx/SoftFFmpegAudio.cpp
++++ b/omx/SoftFFmpegAudio.cpp
+@@ -67,6 +67,7 @@ SoftFFmpegAudio::SoftFFmpegAudio(
+       mCtx(NULL),
+       mSwrCtx(NULL),
+       mFrame(NULL),
++      mPacket(NULL),
+       mEOSStatus(INPUT_DATA_AVAILABLE),
+       mSignalledError(false),
+       mInputBufferSize(0),
+@@ -249,6 +250,10 @@ void SoftFFmpegAudio::deInitDecoder() {
+         av_frame_free(&mFrame);
+         mFrame = NULL;
+     }
++    if (mPacket) {
++        av_packet_free(&mPacket);
++        mPacket = NULL;
++    }
+ #ifdef LIBAV_CONFIG_H
+ #else
+     if (mSwrCtx) {
+@@ -1168,9 +1173,6 @@ void SoftFFmpegAudio::updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader) {
+ 
+ void SoftFFmpegAudio::initPacket(AVPacket *pkt,
+         OMX_BUFFERHEADERTYPE *inHeader) {
+-    memset(pkt, 0, sizeof(AVPacket));
+-    av_init_packet(pkt);
+-
+     if (inHeader) {
+         pkt->data = (uint8_t *)inHeader->pBuffer + inHeader->nOffset;
+         pkt->size = inHeader->nFilledLen;
+@@ -1220,11 +1222,17 @@ int32_t SoftFFmpegAudio::decodeAudio() {
+         return ERR_FLUSHED;
+     }
+ 
+-    AVPacket pkt;
+-    initPacket(&pkt, inHeader);
++    if (!mPacket) {
++        mPacket = av_packet_alloc();
++        if (!mPacket) {
++            ALOGE("oom for audio packet");
++            return ERR_OOM;
++        }
++    }
+ 
+-    len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, &pkt);
+-    av_packet_unref(&pkt);
++    initPacket(mPacket, inHeader);
++    len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, mPacket);
++    av_packet_unref(mPacket);
+ 
+     //a negative error code is returned if an error occurred during decoding
+     if (len < 0) {
+diff --git a/omx/SoftFFmpegAudio.h b/omx/SoftFFmpegAudio.h
+index 2cc01db..1ab8d72 100644
+--- a/omx/SoftFFmpegAudio.h
++++ b/omx/SoftFFmpegAudio.h
+@@ -103,6 +103,7 @@ private:
+     AVCodecContext *mCtx;
+     struct SwrContext *mSwrCtx;
+     AVFrame *mFrame;
++    AVPacket *mPacket;
+ 
+     uint8_t *mVorbisHeaderStart[3];
+     int mVorbisHeaderLen[3];
+diff --git a/omx/SoftFFmpegVideo.cpp b/omx/SoftFFmpegVideo.cpp
+index 27a53f4..da6e6f3 100644
+--- a/omx/SoftFFmpegVideo.cpp
++++ b/omx/SoftFFmpegVideo.cpp
+@@ -77,6 +77,7 @@ SoftFFmpegVideo::SoftFFmpegVideo(
+       mCtx(NULL),
+       mImgConvertCtx(NULL),
+       mFrame(NULL),
++      mPacket(NULL),
+       mEOSStatus(INPUT_DATA_AVAILABLE),
+       mExtradataReady(false),
+       mIgnoreExtradata(false),
+@@ -167,6 +168,10 @@ void SoftFFmpegVideo::deInitDecoder() {
+         av_frame_free(&mFrame);
+         mFrame = NULL;
+     }
++    if (mPacket) {
++        av_packet_free(&mPacket);
++        mPacket = NULL;
++    }
+     if (mImgConvertCtx) {
+         sws_freeContext(mImgConvertCtx);
+         mImgConvertCtx = NULL;
+@@ -452,9 +457,6 @@ int32_t SoftFFmpegVideo::openDecoder() {
+ 
+ void SoftFFmpegVideo::initPacket(AVPacket *pkt,
+         OMX_BUFFERHEADERTYPE *inHeader) {
+-    memset(pkt, 0, sizeof(AVPacket));
+-    av_init_packet(pkt);
+-
+     if (inHeader) {
+         pkt->data = (uint8_t *)inHeader->pBuffer + inHeader->nOffset;
+         pkt->size = inHeader->nFilledLen;
+@@ -496,11 +498,17 @@ int32_t SoftFFmpegVideo::decodeVideo() {
+         return ERR_FLUSHED;
+     }
+ 
+-    AVPacket pkt;
+-    initPacket(&pkt, inHeader);
++    if (!mPacket) {
++        mPacket = av_packet_alloc();
++        if (!mPacket) {
++            ALOGE("oom for video packet");
++            return ERR_OOM;
++        }
++    }
+ 
+-    err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
+-    av_packet_unref(&pkt);
++    initPacket(mPacket, inHeader);
++    err = avcodec_decode_video2(mCtx, mFrame, &gotPic, mPacket);
++    av_packet_unref(mPacket);
+ 
+     if (err < 0) {
+         ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);
+diff --git a/omx/SoftFFmpegVideo.h b/omx/SoftFFmpegVideo.h
+index e116974..255f86b 100644
+--- a/omx/SoftFFmpegVideo.h
++++ b/omx/SoftFFmpegVideo.h
+@@ -84,6 +84,7 @@ private:
+     AVCodecContext *mCtx;
+     struct SwsContext *mImgConvertCtx;
+     AVFrame *mFrame;
++    AVPacket *mPacket;
+ 
+     EOSStatus mEOSStatus;
+ 
+diff --git a/utils/ffmpeg_utils.cpp b/utils/ffmpeg_utils.cpp
+index d923c2c..f2e2bd3 100644
+--- a/utils/ffmpeg_utils.cpp
++++ b/utils/ffmpeg_utils.cpp
+@@ -151,26 +151,6 @@ const struct { const char *name; int level; } log_levels[] = {
+ //////////////////////////////////////////////////////////////////////////////////
+ // constructor and destructor
+ //////////////////////////////////////////////////////////////////////////////////
+-/* Mutex manager callback. */
+-static int lockmgr(void **mtx, enum AVLockOp op)
+-{
+-    switch (op) {
+-    case AV_LOCK_CREATE:
+-        *mtx = (void *)av_malloc(sizeof(pthread_mutex_t));
+-        if (!*mtx)
+-            return 1;
+-        return !!pthread_mutex_init((pthread_mutex_t *)(*mtx), NULL);
+-    case AV_LOCK_OBTAIN:
+-        return !!pthread_mutex_lock((pthread_mutex_t *)(*mtx));
+-    case AV_LOCK_RELEASE:
+-        return !!pthread_mutex_unlock((pthread_mutex_t *)(*mtx));
+-    case AV_LOCK_DESTROY:
+-        pthread_mutex_destroy((pthread_mutex_t *)(*mtx));
+-        av_freep(mtx);
+-        return 0;
+-    }
+-    return 1;
+-}
+ 
+ /**
+  * To debug ffmpeg", type this command on the console before starting playback:
+@@ -193,23 +173,13 @@ status_t initFFmpeg()
+         nam_av_log_set_flags(AV_LOG_SKIP_REPEATED);
+         av_log_set_callback(nam_av_log_callback);
+ 
+-        /* register all codecs, demux and protocols */
+-        avcodec_register_all();
+-#if 0
+-        avdevice_register_all();
+-#endif
+-        av_register_all();
++        /* global ffmpeg initialization */
+         avformat_network_init();
+ 
+         /* register android source */
+         ffmpeg_register_android_source();
+ 
+         ALOGI("FFMPEG initialized: %s", av_version_info());
+-
+-        if (av_lockmgr_register(lockmgr)) {
+-            ALOGE("could not initialize lock manager!");
+-            ret = NO_INIT;
+-        }
+     }
+ 
+     // update counter
+@@ -228,7 +198,6 @@ void deInitFFmpeg()
+     s_ref_count--;
+ 
+     if(s_ref_count == 0) {
+-        av_lockmgr_register(NULL);
+         avformat_network_deinit();
+         ALOGD("FFMPEG deinitialized");
+     }
+@@ -336,16 +305,37 @@ int is_extradata_compatible_with_android(AVCodecParameters *avpar)
+ //////////////////////////////////////////////////////////////////////////////////
+ // packet queue
+ //////////////////////////////////////////////////////////////////////////////////
+-void packet_queue_init(PacketQueue *q)
++
++typedef struct PacketList {
++    AVPacket *pkt;
++    struct PacketList *next;
++} PacketList;
++
++typedef struct PacketQueue {
++    PacketList *first_pkt, *last_pkt;
++    int nb_packets;
++    int size;
++    int wait_for_data;
++    int abort_request;
++    Mutex lock;
++    Condition cond;
++} PacketQueue;
++
++PacketQueue* packet_queue_alloc()
+ {
+-    memset(q, 0, sizeof(PacketQueue));
+-    q->abort_request = 1;
++    PacketQueue *queue = (PacketQueue*)av_mallocz(sizeof(PacketQueue));
++    if (queue) {
++        queue->abort_request = 1;
++        return queue;
++    }
++    return NULL;
+ }
+ 
+-void packet_queue_destroy(PacketQueue *q)
++void packet_queue_free(PacketQueue **q)
+ {
+-    packet_queue_abort(q);
+-    packet_queue_flush(q);
++    packet_queue_abort(*q);
++    packet_queue_flush(*q);
++    av_freep(q);
+ }
+ 
+ void packet_queue_abort(PacketQueue *q)
+@@ -357,15 +347,20 @@ void packet_queue_abort(PacketQueue *q)
+ 
+ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
+ {
+-    AVPacketList *pkt1;
++    PacketList *pkt1;
+ 
+     if (q->abort_request)
+         return -1;
+ 
+-    pkt1 = (AVPacketList *)av_malloc(sizeof(AVPacketList));
++    pkt1 = (PacketList *)av_malloc(sizeof(PacketList));
+     if (!pkt1)
+         return -1;
+-    av_packet_move_ref(&pkt1->pkt, pkt);
++    pkt1->pkt = av_packet_alloc();
++    if (!pkt1->pkt) {
++        av_free(pkt1);
++        return -1;
++    }
++    av_packet_move_ref(pkt1->pkt, pkt);
+     pkt1->next = NULL;
+ 
+     if (!q->last_pkt)
+@@ -375,7 +370,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
+     q->last_pkt = pkt1;
+     q->nb_packets++;
+     //q->size += pkt1->pkt.size + sizeof(*pkt1);
+-    q->size += pkt1->pkt.size;
++    q->size += pkt1->pkt->size;
+     q->cond.signal();
+     return 0;
+ }
+@@ -399,12 +394,12 @@ int packet_queue_is_wait_for_data(PacketQueue *q)
+ 
+ void packet_queue_flush(PacketQueue *q)
+ {
+-    AVPacketList *pkt, *pkt1;
++    PacketList *pkt, *pkt1;
+ 
+     Mutex::Autolock autoLock(q->lock);
+     for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
+         pkt1 = pkt->next;
+-        av_packet_unref(&pkt->pkt);
++        av_packet_free(&pkt->pkt);
+         av_freep(&pkt);
+     }
+     q->last_pkt = NULL;
+@@ -415,19 +410,24 @@ void packet_queue_flush(PacketQueue *q)
+ 
+ int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
+ {
+-    AVPacket pkt1, *pkt = &pkt1;
+-    av_init_packet(pkt);
++    AVPacket *pkt;
++    int err;
++
++    pkt = av_packet_alloc();
+     pkt->data = NULL;
+     pkt->size = 0;
+     pkt->stream_index = stream_index;
+-    return packet_queue_put(q, pkt);
++    err = packet_queue_put(q, pkt);
++    av_packet_free(&pkt);
++
++    return err;
+ }
+ 
+ /* packet queue handling */
+ /* return < 0 if aborted, 0 if no packet and > 0 if packet.  */
+ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
+ {
+-    AVPacketList *pkt1;
++    PacketList *pkt1;
+     int ret = -1;
+ 
+     Mutex::Autolock autoLock(q->lock);
+@@ -440,8 +440,9 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
+                 q->last_pkt = NULL;
+             q->nb_packets--;
+             //q->size -= pkt1->pkt.size + sizeof(*pkt1);
+-            q->size -= pkt1->pkt.size;
+-            av_packet_move_ref(pkt, &pkt1->pkt);
++            q->size -= pkt1->pkt->size;
++            av_packet_move_ref(pkt, pkt1->pkt);
++            av_packet_free(&pkt1->pkt);
+             av_free(pkt1);
+             ret = 1;
+             break;
+diff --git a/utils/ffmpeg_utils.h b/utils/ffmpeg_utils.h
+index 51dabcb..4ab16f0 100644
+--- a/utils/ffmpeg_utils.h
++++ b/utils/ffmpeg_utils.h
+@@ -69,18 +69,10 @@ int parser_split(AVCodecParameters *avpar, const uint8_t *buf, int buf_size);
+ // packet queue
+ //////////////////////////////////////////////////////////////////////////////////
+ 
+-typedef struct PacketQueue {
+-    AVPacketList *first_pkt, *last_pkt;
+-    int nb_packets;
+-    int size;
+-    int wait_for_data;
+-    int abort_request;
+-    Mutex lock;
+-    Condition cond;
+-} PacketQueue;
+-
+-void packet_queue_init(PacketQueue *q);
+-void packet_queue_destroy(PacketQueue *q);
++typedef struct PacketQueue PacketQueue;
++
++PacketQueue* packet_queue_alloc();
++void packet_queue_free(PacketQueue **q);
+ void packet_queue_flush(PacketQueue *q);
+ void packet_queue_start(PacketQueue *q);
+ void packet_queue_abort(PacketQueue *q);

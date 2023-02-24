@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+
+  <!-- From Android-x86 repositories -->
+  <remote  name="x86"
+           fetch="http://scm.osdn.net/gitroot/android-x86/" />
+  <remote  name="blissroms-x86"
+           fetch="https://github.com/BlissRoms-x86/" />
+  <remote  name="android-generic"
+           fetch="https://gitlab.com/android-generic/" />
+  <remote  name="glodroid"
+           fetch="https://github.com/glodroid/" />
+  <remote  name="freedesktop"
+           fetch="https://gitlab.freedesktop.org/" />
+  <remote  name="ffmpeg"
+           fetch="https://git.ffmpeg.org/" />
+
+</manifest>

@@ -1,0 +1,1144 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chih-Wei Huang <cwhuang@linux.org.tw>
+Date: Fri, 8 Dec 2017 17:08:43 +0800
+Subject: [PATCH 1/4] Add Manufacturer to device info
+
+Add an item to display manufacturer in hardware info page.
+---
+ res/values-af/strings.xml                     |  1 +
+ res/values-am/strings.xml                     |  1 +
+ res/values-ar/strings.xml                     |  1 +
+ res/values-as/strings.xml                     |  1 +
+ res/values-az/strings.xml                     |  1 +
+ res/values-b+sr+Latn/strings.xml              |  1 +
+ res/values-be/strings.xml                     |  1 +
+ res/values-bg/strings.xml                     |  1 +
+ res/values-bn/strings.xml                     |  1 +
+ res/values-bs/strings.xml                     |  1 +
+ res/values-ca/strings.xml                     |  1 +
+ res/values-cs/strings.xml                     |  1 +
+ res/values-da/strings.xml                     |  1 +
+ res/values-de/strings.xml                     |  1 +
+ res/values-el/strings.xml                     |  1 +
+ res/values-es-rUS/strings.xml                 |  1 +
+ res/values-es/strings.xml                     |  1 +
+ res/values-et/strings.xml                     |  1 +
+ res/values-eu/strings.xml                     |  1 +
+ res/values-fa/strings.xml                     |  1 +
+ res/values-fi/strings.xml                     |  1 +
+ res/values-fr-rCA/strings.xml                 |  1 +
+ res/values-fr/strings.xml                     |  1 +
+ res/values-gl/strings.xml                     |  1 +
+ res/values-gu/strings.xml                     |  1 +
+ res/values-hi/strings.xml                     |  1 +
+ res/values-hr/strings.xml                     |  1 +
+ res/values-hu/strings.xml                     |  1 +
+ res/values-hy/strings.xml                     |  1 +
+ res/values-in/strings.xml                     |  1 +
+ res/values-is/strings.xml                     |  1 +
+ res/values-it/strings.xml                     |  1 +
+ res/values-iw/strings.xml                     |  1 +
+ res/values-ja/strings.xml                     |  1 +
+ res/values-ka/strings.xml                     |  1 +
+ res/values-kk/strings.xml                     |  1 +
+ res/values-km/strings.xml                     |  1 +
+ res/values-kn/strings.xml                     |  1 +
+ res/values-ko/strings.xml                     |  1 +
+ res/values-ky/strings.xml                     |  1 +
+ res/values-lo/strings.xml                     |  1 +
+ res/values-lt/strings.xml                     |  1 +
+ res/values-lv/strings.xml                     |  1 +
+ res/values-mk/strings.xml                     |  1 +
+ res/values-ml/strings.xml                     |  1 +
+ res/values-mn/strings.xml                     |  1 +
+ res/values-mr/strings.xml                     |  1 +
+ res/values-ms/strings.xml                     |  1 +
+ res/values-my/strings.xml                     |  1 +
+ res/values-nb/strings.xml                     |  1 +
+ res/values-ne/strings.xml                     |  1 +
+ res/values-nl/strings.xml                     |  1 +
+ res/values-or/strings.xml                     |  1 +
+ res/values-pa/strings.xml                     |  1 +
+ res/values-pl/strings.xml                     |  1 +
+ res/values-pt-rBR/strings.xml                 |  1 +
+ res/values-pt-rPT/strings.xml                 |  1 +
+ res/values-pt/strings.xml                     |  1 +
+ res/values-ro/strings.xml                     |  1 +
+ res/values-ru/strings.xml                     |  1 +
+ res/values-si/strings.xml                     |  1 +
+ res/values-sk/strings.xml                     |  1 +
+ res/values-sl/strings.xml                     |  1 +
+ res/values-sq/strings.xml                     |  1 +
+ res/values-sr/strings.xml                     |  1 +
+ res/values-sv/strings.xml                     |  1 +
+ res/values-sw/strings.xml                     |  1 +
+ res/values-ta/strings.xml                     |  1 +
+ res/values-te/strings.xml                     |  1 +
+ res/values-th/strings.xml                     |  1 +
+ res/values-tl/strings.xml                     |  1 +
+ res/values-tr/strings.xml                     |  1 +
+ res/values-uk/strings.xml                     |  1 +
+ res/values-ur/strings.xml                     |  1 +
+ res/values-uz/strings.xml                     |  1 +
+ res/values-vi/strings.xml                     |  1 +
+ res/values-zh-rCN/strings.xml                 |  1 +
+ res/values-zh-rHK/strings.xml                 |  1 +
+ res/values-zh-rTW/strings.xml                 |  1 +
+ res/values-zu/strings.xml                     |  1 +
+ res/values/strings.xml                        |  2 +
+ res/xml/hardware_info.xml                     |  8 +++
+ ...eviceManufacturerPreferenceController.java | 53 +++++++++++++++++++
+ 83 files changed, 143 insertions(+)
+ create mode 100644 src/com/android/settings/deviceinfo/hardwareinfo/DeviceManufacturerPreferenceController.java
+
+diff --git a/res/values-af/strings.xml b/res/values-af/strings.xml
+index 262c8de427..a8fc8ba7a5 100644
+--- a/res/values-af/strings.xml
++++ b/res/values-af/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-weergawe"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-sekuriteitopdatering"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Vervaardiger"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardewareweergawe"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Toerusting-ID"</string>
+diff --git a/res/values-am/strings.xml b/res/values-am/strings.xml
+index 62482f2030..b128fa8c1e 100644
+--- a/res/values-am/strings.xml
++++ b/res/values-am/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android ሥሪት"</string>
+     <string name="security_patch" msgid="4071756145347865382">"የAndroid ደህንነት ዝማኔ"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"አምራች"</string>
+     <string name="model_info" msgid="8997566254717810904">"ሞዴል"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"የሃርድዌር ስሪት"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"የመሣሪያ መታወቂያ"</string>
+diff --git a/res/values-ar/strings.xml b/res/values-ar/strings.xml
+index 054e7a3255..e1a7b69def 100644
+--- a/res/values-ar/strings.xml
++++ b/res/values-ar/strings.xml
+@@ -1665,6 +1665,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"‏إصدار Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"‏تحديث أمان نظام Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"جهة التصنيع"</string>
+     <string name="model_info" msgid="8997566254717810904">"الطراز"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"إصدار الجهاز"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"معرّف الجهاز"</string>
+diff --git a/res/values-as/strings.xml b/res/values-as/strings.xml
+index 4fd1f90ed3..51ae8a2772 100644
+--- a/res/values-as/strings.xml
++++ b/res/values-as/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android সংস্কৰণ"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android সুৰক্ষা আপডে’ট"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"উত্পাদক"</string>
+     <string name="model_info" msgid="8997566254717810904">"মডেল"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"হাৰ্ডৱেৰৰ সংস্কৰণ"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"সঁজুলিৰ ID"</string>
+diff --git a/res/values-az/strings.xml b/res/values-az/strings.xml
+index ba058b81fc..a95ef0f15d 100644
+--- a/res/values-az/strings.xml
++++ b/res/values-az/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android versiyası"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android güvənlik güncəllənməsi"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"İstehsalçı"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Avadanlıq versiyası"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Avadanlıq ID"</string>
+diff --git a/res/values-b+sr+Latn/strings.xml b/res/values-b+sr+Latn/strings.xml
+index c1de49cfb4..b44986a3b6 100644
+--- a/res/values-b+sr+Latn/strings.xml
++++ b/res/values-b+sr+Latn/strings.xml
+@@ -1602,6 +1602,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android verzija"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Bezbednosno ažuriranje za Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Proizvođač"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Verzija hardvera"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID opreme"</string>
+diff --git a/res/values-be/strings.xml b/res/values-be/strings.xml
+index ecf07071ed..bb33239a20 100644
+--- a/res/values-be/strings.xml
++++ b/res/values-be/strings.xml
+@@ -1625,6 +1625,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Версія Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Абнаўленне сістэмы бяспекі Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Вытворца"</string>
+     <string name="model_info" msgid="8997566254717810904">"Мадэль"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Версія апаратнага забеспячэння"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Iдэнтыфiкатар абсталявання"</string>
+diff --git a/res/values-bg/strings.xml b/res/values-bg/strings.xml
+index e1080ee45a..d9d301ecc2 100644
+--- a/res/values-bg/strings.xml
++++ b/res/values-bg/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Версия на Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Актуализация за сигурността на Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Производител"</string>
+     <string name="model_info" msgid="8997566254717810904">"Модел"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Версия на хардуера"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Идент. № на оборудването"</string>
+diff --git a/res/values-bn/strings.xml b/res/values-bn/strings.xml
+index 97c35cefb1..0cf16f2922 100644
+--- a/res/values-bn/strings.xml
++++ b/res/values-bn/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android ভার্সন"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-এর নিরাপত্তা সংক্রান্ত আপডেট"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"প্রস্তুতকারক"</string>
+     <string name="model_info" msgid="8997566254717810904">"মডেল"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"হার্ডওয়্যার ভার্সন"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"টুল ID"</string>
+diff --git a/res/values-bs/strings.xml b/res/values-bs/strings.xml
+index daae87ae54..950cd5a8bf 100644
+--- a/res/values-bs/strings.xml
++++ b/res/values-bs/strings.xml
+@@ -1602,6 +1602,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Verzija Androida"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Sigurnosno ažuriranje za Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Proizvođač"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Verzija hardvera"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID opreme"</string>
+diff --git a/res/values-ca/strings.xml b/res/values-ca/strings.xml
+index 134af7a14c..2dbce48a6e 100644
+--- a/res/values-ca/strings.xml
++++ b/res/values-ca/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versió d\'Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Actualització de seguretat d\'Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricant"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versió del maquinari"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Id. de l\'equip"</string>
+diff --git a/res/values-cs/strings.xml b/res/values-cs/strings.xml
+index 7929177673..6c1e288894 100644
+--- a/res/values-cs/strings.xml
++++ b/res/values-cs/strings.xml
+@@ -1623,6 +1623,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Verze systému Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Aktualizace zabezpečení Androidu"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Výrobce"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Verze hardwaru"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID zařízení"</string>
+diff --git a/res/values-da/strings.xml b/res/values-da/strings.xml
+index 92d3e75ead..e4b280ac53 100644
+--- a/res/values-da/strings.xml
++++ b/res/values-da/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-version"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Sikkerhedsopdatering til Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Producent"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardwareversion"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Udstyrs-id"</string>
+diff --git a/res/values-de/strings.xml b/res/values-de/strings.xml
+index 3871ff7b40..a0b2865c1a 100644
+--- a/res/values-de/strings.xml
++++ b/res/values-de/strings.xml
+@@ -1588,6 +1588,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-Version"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-Sicherheitsupdate"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Hersteller"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modell"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardwareversion"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Geräte-ID"</string>
+diff --git a/res/values-el/strings.xml b/res/values-el/strings.xml
+index 29b104b2bf..8d5774f61c 100644
+--- a/res/values-el/strings.xml
++++ b/res/values-el/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Έκδοση Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Ενημέρωση ασφαλείας Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Κατασκευαστής"</string>
+     <string name="model_info" msgid="8997566254717810904">"Μοντέλο"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Έκδοση εξοπλισμού"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Αναγνωριστικό εξοπλισμού"</string>
+diff --git a/res/values-es-rUS/strings.xml b/res/values-es-rUS/strings.xml
+index 05dcb1b25c..b9fd2f4e4d 100644
+--- a/res/values-es-rUS/strings.xml
++++ b/res/values-es-rUS/strings.xml
+@@ -1583,6 +1583,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versión de Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Actualización de seguridad de Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricante"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versión de hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID del equipo"</string>
+diff --git a/res/values-es/strings.xml b/res/values-es/strings.xml
+index c425762390..e76d8542fe 100644
+--- a/res/values-es/strings.xml
++++ b/res/values-es/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versión de Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Actualización de seguridad de Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricante"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versión de hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID de equipo"</string>
+diff --git a/res/values-et/strings.xml b/res/values-et/strings.xml
+index a26a9b035d..fe87755d18 100644
+--- a/res/values-et/strings.xml
++++ b/res/values-et/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Androidi versioon"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Androidi turvavärskendus"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Tootja"</string>
+     <string name="model_info" msgid="8997566254717810904">"Mudel"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Riistvara versioon"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Seadme ID"</string>
+diff --git a/res/values-eu/strings.xml b/res/values-eu/strings.xml
+index 8115a0b96a..29fd1534ce 100644
+--- a/res/values-eu/strings.xml
++++ b/res/values-eu/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-en bertsioa"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-en segurtasun-eguneratzea"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabrikatzailea"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modeloa"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardware-bertsioa"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Ekipoaren IDa"</string>
+diff --git a/res/values-fa/strings.xml b/res/values-fa/strings.xml
+index a9d8c0a39d..dadf70760d 100644
+--- a/res/values-fa/strings.xml
++++ b/res/values-fa/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"‏نسخهٔ Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"‏به‌روزرسانی امنیتی Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"سازنده"</string>
+     <string name="model_info" msgid="8997566254717810904">"مدل"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"نسخه سخت‌افزار"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"شناسه دستگاه"</string>
+diff --git a/res/values-fi/strings.xml b/res/values-fi/strings.xml
+index 1aae2b4390..04985954bb 100644
+--- a/res/values-fi/strings.xml
++++ b/res/values-fi/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-versio"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Androidin tietoturvapäivitys"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Valmistaja"</string>
+     <string name="model_info" msgid="8997566254717810904">"Malli"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Laitteistoversio"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Varustetunnus"</string>
+diff --git a/res/values-fr-rCA/strings.xml b/res/values-fr-rCA/strings.xml
+index 3b06c5fa63..ab5e9ad33c 100644
+--- a/res/values-fr-rCA/strings.xml
++++ b/res/values-fr-rCA/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Version d\'Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Mise à jour de sécurité Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricant"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modèle"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Version du matériel"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Equipment ID"</string>
+diff --git a/res/values-fr/strings.xml b/res/values-fr/strings.xml
+index 3822868ec7..74627f9219 100644
+--- a/res/values-fr/strings.xml
++++ b/res/values-fr/strings.xml
+@@ -1583,6 +1583,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Version d\'Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Mise à jour de sécurité Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricant"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modèle"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Version du matériel"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID de l\'équipement"</string>
+diff --git a/res/values-gl/strings.xml b/res/values-gl/strings.xml
+index 6cf21f598f..7396d0778e 100644
+--- a/res/values-gl/strings.xml
++++ b/res/values-gl/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versión de Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Actualización de seguranza de Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricante"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versión do hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID de equipamento"</string>
+diff --git a/res/values-gu/strings.xml b/res/values-gu/strings.xml
+index 32ade49181..8cb2d0ec5b 100644
+--- a/res/values-gu/strings.xml
++++ b/res/values-gu/strings.xml
+@@ -1582,6 +1582,7 @@
+     <string name="firmware_version" msgid="1606901586501447275">"Android વર્ઝન"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android માટે સુરક્ષા અપડેટ"</string>
+     <string name="model_info" msgid="8997566254717810904">"મૉડલ"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"નિર્માતા"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"હાર્ડવેર વર્ઝન"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"સાધન ID"</string>
+     <string name="baseband_version" msgid="2600182227599835857">"બેઝબૅન્ડ વર્ઝન"</string>
+diff --git a/res/values-hi/strings.xml b/res/values-hi/strings.xml
+index 62b10222b0..a64a7cc7cb 100644
+--- a/res/values-hi/strings.xml
++++ b/res/values-hi/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android वर्शन"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android की सुरक्षा से जुड़ा अपडेट"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"निर्माता"</string>
+     <string name="model_info" msgid="8997566254717810904">"मॉडल"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"हार्डवेयर वर्शन"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"डिवाइस आईडी"</string>
+diff --git a/res/values-hr/strings.xml b/res/values-hr/strings.xml
+index be0866f275..134a16dec0 100644
+--- a/res/values-hr/strings.xml
++++ b/res/values-hr/strings.xml
+@@ -1604,6 +1604,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Verzija sustava Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Sigurnosno ažuriranje za Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Proizvođač"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Verzija hardvera"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID opreme"</string>
+diff --git a/res/values-hu/strings.xml b/res/values-hu/strings.xml
+index 12c4b6b264..5dce60d3ef 100644
+--- a/res/values-hu/strings.xml
++++ b/res/values-hu/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android verziója"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android biztonsági frissítés"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Gyártó"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modell"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardververzió"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Eszközazonosító"</string>
+diff --git a/res/values-hy/strings.xml b/res/values-hy/strings.xml
+index 0127945d56..3bdd108267 100644
+--- a/res/values-hy/strings.xml
++++ b/res/values-hy/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-ի տարբերակը"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-ի անվտանգության համակարգի թարմացում"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Արտադրող"</string>
+     <string name="model_info" msgid="8997566254717810904">"Մոդելը"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Սարքակազմի տարբերակը"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Սարքավորման ID-ն"</string>
+diff --git a/res/values-in/strings.xml b/res/values-in/strings.xml
+index 971d1c2444..8c8782db0a 100644
+--- a/res/values-in/strings.xml
++++ b/res/values-in/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versi Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Update keamanan Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Produsen"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versi hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID Peralatan"</string>
+diff --git a/res/values-is/strings.xml b/res/values-is/strings.xml
+index fdb573398b..660f464f53 100644
+--- a/res/values-is/strings.xml
++++ b/res/values-is/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android útgáfa"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Öryggisuppfærsla fyrir Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Framleiðandi"</string>
+     <string name="model_info" msgid="8997566254717810904">"Gerð"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Vélbúnaðarútgáfa"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Auðkenni búnaðar"</string>
+diff --git a/res/values-it/strings.xml b/res/values-it/strings.xml
+index a4ad7bbaf2..9a211efd02 100644
+--- a/res/values-it/strings.xml
++++ b/res/values-it/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versione di Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Aggiornamento della sicurezza Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Produttore"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modello"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versione hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID attrezzatura"</string>
+diff --git a/res/values-iw/strings.xml b/res/values-iw/strings.xml
+index fbd6e4aec9..87fc5721a4 100644
+--- a/res/values-iw/strings.xml
++++ b/res/values-iw/strings.xml
+@@ -1627,6 +1627,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"‏גרסת Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"‏עדכון אבטחה ל-‏Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"יצרן"</string>
+     <string name="model_info" msgid="8997566254717810904">"דגם"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"גרסת חומרה"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"זיהוי ציוד"</string>
+diff --git a/res/values-ja/strings.xml b/res/values-ja/strings.xml
+index 9ad8203432..308c7d5967 100644
+--- a/res/values-ja/strings.xml
++++ b/res/values-ja/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android バージョン"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android セキュリティ アップデート"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"メーカー"</string>
+     <string name="model_info" msgid="8997566254717810904">"モデル"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ハードウェア バージョン"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"装置ID"</string>
+diff --git a/res/values-ka/strings.xml b/res/values-ka/strings.xml
+index ec5dd239ab..3fed167899 100644
+--- a/res/values-ka/strings.xml
++++ b/res/values-ka/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-ის ვერსია"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-ის უსაფრთხოების განახლება"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"მწარმოებელი"</string>
+     <string name="model_info" msgid="8997566254717810904">"მოდელი"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"აპარატურის ვერსია"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"მოწყობილობის ID"</string>
+diff --git a/res/values-kk/strings.xml b/res/values-kk/strings.xml
+index fe06815851..bbe359f10b 100644
+--- a/res/values-kk/strings.xml
++++ b/res/values-kk/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android нұсқасы"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android қауіпсіздік жүйесін жаңарту"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Өндіруші"</string>
+     <string name="model_info" msgid="8997566254717810904">"Үлгісі"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Жабдық нұсқасы"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Жабдық ЖА"</string>
+diff --git a/res/values-km/strings.xml b/res/values-km/strings.xml
+index 6c28bbe1b1..fd1a1b99d2 100644
+--- a/res/values-km/strings.xml
++++ b/res/values-km/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"កំណែ Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"កំណែ​សុវត្ថិភាពថ្មី​របស់ Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ក្រុមហ៊ុនផលិត"</string>
+     <string name="model_info" msgid="8997566254717810904">"ម៉ូដែល"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"កំណែ​ហាតវែរ"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"លេខ​សម្គាល់​បរិក្ខារ"</string>
+diff --git a/res/values-kn/strings.xml b/res/values-kn/strings.xml
+index b018692a2f..31d26eb96d 100644
+--- a/res/values-kn/strings.xml
++++ b/res/values-kn/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android ಆವೃತ್ತಿ"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android ಭದ್ರತೆ ಅಪ್‌ಡೇಟ್"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ತಯಾರಕರು"</string>
+     <string name="model_info" msgid="8997566254717810904">"ಮಾಡೆಲ್"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ಹಾರ್ಡ್‌ವೇರ್ ಆವೃತ್ತಿ"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ಸಲಕರಣೆ ID"</string>
+diff --git a/res/values-ko/strings.xml b/res/values-ko/strings.xml
+index 4ee61f4730..4918d36257 100644
+--- a/res/values-ko/strings.xml
++++ b/res/values-ko/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android 버전"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android 보안 업데이트"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"제조업체"</string>
+     <string name="model_info" msgid="8997566254717810904">"모델"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"하드웨어 버전"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"장비 ID"</string>
+diff --git a/res/values-ky/strings.xml b/res/values-ky/strings.xml
+index 0b28446705..bd66f461fd 100644
+--- a/res/values-ky/strings.xml
++++ b/res/values-ky/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android версиясы"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android\'дин коопсуздук системасын жаңыртуу"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Өндүрүүчү"</string>
+     <string name="model_info" msgid="8997566254717810904">"Үлгүсү"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Аппараттын версиясы"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Жабдуунун ID\'си"</string>
+diff --git a/res/values-lo/strings.xml b/res/values-lo/strings.xml
+index bbf08b991c..75cbb09983 100644
+--- a/res/values-lo/strings.xml
++++ b/res/values-lo/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"ເວີຊັນຂອງ Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"ອັບເດດຄວາມປອດໄພ Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ຜູ້ຜະລິດ"</string>
+     <string name="model_info" msgid="8997566254717810904">"ໂມເດວ"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ເວີຊັນຂອງຮາດແວ"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ໝາຍເລກອຸປະກອນ"</string>
+diff --git a/res/values-lt/strings.xml b/res/values-lt/strings.xml
+index 784e7d863e..078ce7bdb6 100644
+--- a/res/values-lt/strings.xml
++++ b/res/values-lt/strings.xml
+@@ -1623,6 +1623,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"„Android“ versija"</string>
+     <string name="security_patch" msgid="4071756145347865382">"„Android“ saugos naujinys"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Gamintojas"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelis"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Aparatinės įrangos versija"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Įrangos ID"</string>
+diff --git a/res/values-lv/strings.xml b/res/values-lv/strings.xml
+index 551d15d6e7..1b86d85d9e 100644
+--- a/res/values-lv/strings.xml
++++ b/res/values-lv/strings.xml
+@@ -1602,6 +1602,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android versija"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android drošības atjauninājums"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Ražotājs"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelis"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Aparatūras versija"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Iekārtas ID"</string>
+diff --git a/res/values-mk/strings.xml b/res/values-mk/strings.xml
+index d011e3d467..02314bb2d9 100644
+--- a/res/values-mk/strings.xml
++++ b/res/values-mk/strings.xml
+@@ -1585,6 +1585,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Верзија на Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Безбедносно ажурирање на Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Производителот"</string>
+     <string name="model_info" msgid="8997566254717810904">"Модел"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Верзија на хардвер"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID на опрема"</string>
+diff --git a/res/values-ml/strings.xml b/res/values-ml/strings.xml
+index 7a70729aab..4ab2f2f223 100644
+--- a/res/values-ml/strings.xml
++++ b/res/values-ml/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android പതിപ്പ്"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android സുരക്ഷാ അപ്ഡേറ്റ്"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"നിർമ്മാതാവ്"</string>
+     <string name="model_info" msgid="8997566254717810904">"മോഡല്‍"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ഹാർഡ്‌വെയർ പതിപ്പ്"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ഉപകരണ ഐഡി"</string>
+diff --git a/res/values-mn/strings.xml b/res/values-mn/strings.xml
+index 2f1959c0bd..5c04afe103 100644
+--- a/res/values-mn/strings.xml
++++ b/res/values-mn/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Андройд хувилбар"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-н аюулгүй байдлын шинэчлэлт"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Үйлдвэрлэгч"</string>
+     <string name="model_info" msgid="8997566254717810904">"Загвар"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Техник хангамжийн хувилбар"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Төхөөрөмжийн ID"</string>
+diff --git a/res/values-mr/strings.xml b/res/values-mr/strings.xml
+index 9aec6bc1bb..2f53ed3fdc 100644
+--- a/res/values-mr/strings.xml
++++ b/res/values-mr/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android आवृत्ती"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android सुरक्षा अपडेट"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"निर्माता"</string>
+     <string name="model_info" msgid="8997566254717810904">"मॉडेल"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"हार्डवेअर आवृत्ती"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"उपकरण आयडी"</string>
+diff --git a/res/values-ms/strings.xml b/res/values-ms/strings.xml
+index 469f6388ce..20a46859fc 100644
+--- a/res/values-ms/strings.xml
++++ b/res/values-ms/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versi Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Kemaskinian keselamatan Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Pengeluar"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versi perkakasan"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID Peralatan"</string>
+diff --git a/res/values-my/strings.xml b/res/values-my/strings.xml
+index ec60e21032..473654ff6c 100644
+--- a/res/values-my/strings.xml
++++ b/res/values-my/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android ဗားရှင်း"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android လုံခြုံရေးအပ်ဒိတ်"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ထုတ်လုပ်သူ"</string>
+     <string name="model_info" msgid="8997566254717810904">"မော်ဒယ်"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"စက်ပစ္စည်းဗားရှင်း"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"စက်ပစ္စည်း အမှတ်"</string>
+diff --git a/res/values-nb/strings.xml b/res/values-nb/strings.xml
+index f340956ca4..279d75d4b9 100644
+--- a/res/values-nb/strings.xml
++++ b/res/values-nb/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-versjon"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Sikkerhetsoppdatering for Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Produsent"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modell"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Maskinvareversjon"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Utstyrs-ID"</string>
+diff --git a/res/values-ne/strings.xml b/res/values-ne/strings.xml
+index 200f098f54..d109ff9acb 100644
+--- a/res/values-ne/strings.xml
++++ b/res/values-ne/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android संस्करण"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android को सुरक्षासम्बन्धी अपडेट"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"निर्माता"</string>
+     <string name="model_info" msgid="8997566254717810904">"मोडेल"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"हार्डवेयरको संस्करण"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"उपकरण ID"</string>
+diff --git a/res/values-nl/strings.xml b/res/values-nl/strings.xml
+index 5dbe2297e1..f9316a2d6d 100644
+--- a/res/values-nl/strings.xml
++++ b/res/values-nl/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-versie"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android-beveiligingsupdate"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabrikant"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardwareversie"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Apparatuur-ID"</string>
+diff --git a/res/values-or/strings.xml b/res/values-or/strings.xml
+index 1939d700eb..da82520753 100644
+--- a/res/values-or/strings.xml
++++ b/res/values-or/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android ସଂସ୍କରଣ"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android ସୁରକ୍ଷା ଅପଡେଟ୍"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ଉତ୍ପାଦକ"</string>
+     <string name="model_info" msgid="8997566254717810904">"ମଡେଲ"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ହାର୍ଡୱେର ସଂସ୍କରଣ"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ଉପକରଣ ଆଇଡି"</string>
+diff --git a/res/values-pa/strings.xml b/res/values-pa/strings.xml
+index 8fdb84cb8b..633adef9d1 100644
+--- a/res/values-pa/strings.xml
++++ b/res/values-pa/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android ਵਰਜਨ"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android ਸੁਰੱਖਿਆ ਅੱਪਡੇਟ"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ਨਿਰਮਾਤਾ"</string>
+     <string name="model_info" msgid="8997566254717810904">"ਮਾਡਲ"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ਹਾਰਡਵੇਅਰ ਵਰਜਨ"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ਉਪਕਰਨ ਆਈ.ਡੀ."</string>
+diff --git a/res/values-pl/strings.xml b/res/values-pl/strings.xml
+index d3297602be..6e48e3ad17 100644
+--- a/res/values-pl/strings.xml
++++ b/res/values-pl/strings.xml
+@@ -1623,6 +1623,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Wersja Androida"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Aktualizacja zabezpieczeń Androida"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Producent"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Wersja sprzętu"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Identyfikator sprzętu"</string>
+diff --git a/res/values-pt-rBR/strings.xml b/res/values-pt-rBR/strings.xml
+index 6954c44929..e0ace14747 100644
+--- a/res/values-pt-rBR/strings.xml
++++ b/res/values-pt-rBR/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versão do Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Atualização de segurança do Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricante"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versão do hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID do equipamento"</string>
+diff --git a/res/values-pt-rPT/strings.xml b/res/values-pt-rPT/strings.xml
+index d24043aa9d..68417a2eaf 100644
+--- a/res/values-pt-rPT/strings.xml
++++ b/res/values-pt-rPT/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versão do Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Atualização de segurança do Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricante"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versão do hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID do Equipamento"</string>
+diff --git a/res/values-pt/strings.xml b/res/values-pt/strings.xml
+index 6954c44929..e0ace14747 100644
+--- a/res/values-pt/strings.xml
++++ b/res/values-pt/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versão do Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Atualização de segurança do Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Fabricante"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versão do hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID do equipamento"</string>
+diff --git a/res/values-ro/strings.xml b/res/values-ro/strings.xml
+index 0dbd9b4e6f..2b114a84d7 100644
+--- a/res/values-ro/strings.xml
++++ b/res/values-ro/strings.xml
+@@ -1608,6 +1608,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versiune Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Actualizare de securitate Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Producător"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versiune de hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID echipament"</string>
+diff --git a/res/values-ru/strings.xml b/res/values-ru/strings.xml
+index 20172ae96b..3ac3b8f339 100644
+--- a/res/values-ru/strings.xml
++++ b/res/values-ru/strings.xml
+@@ -1623,6 +1623,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Версия Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Обновление системы безопасности Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Производитель"</string>
+     <string name="model_info" msgid="8997566254717810904">"Модель"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Версия аппаратного обеспечения"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Идентификатор оборудования"</string>
+diff --git a/res/values-si/strings.xml b/res/values-si/strings.xml
+index 08e94e403c..894f5b9b47 100644
+--- a/res/values-si/strings.xml
++++ b/res/values-si/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android අනුවාදය"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android ආරක්ෂක යාවත්කාලීනය"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"නිෂ්පාදකයා"</string>
+     <string name="model_info" msgid="8997566254717810904">"මාදිලිය"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"දෘඨාංග අනුවාදය"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"උපකරණ ID"</string>
+diff --git a/res/values-sk/strings.xml b/res/values-sk/strings.xml
+index 67fa8d6157..3c5ea4af6c 100644
+--- a/res/values-sk/strings.xml
++++ b/res/values-sk/strings.xml
+@@ -1629,6 +1629,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Verzia Androidu"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Aktualizácia zabezpečenia Androidu"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Výrobca"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Hardvérová verzia"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID zariadenia"</string>
+diff --git a/res/values-sl/strings.xml b/res/values-sl/strings.xml
+index 0e528e9d6b..fcfeb0e294 100644
+--- a/res/values-sl/strings.xml
++++ b/res/values-sl/strings.xml
+@@ -1629,6 +1629,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Različica sistema Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Varnostna posodobitev za Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Proizvajalec"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Različica strojne opreme"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID opreme"</string>
+diff --git a/res/values-sq/strings.xml b/res/values-sq/strings.xml
+index 15cab931de..27ed7ddbf9 100644
+--- a/res/values-sq/strings.xml
++++ b/res/values-sq/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Versioni i Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Përditësim sigurie për Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Prodhuesi"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modeli"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Versioni i harduerit"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID-ja e pajsjes"</string>
+diff --git a/res/values-sr/strings.xml b/res/values-sr/strings.xml
+index 6e4c5efb8b..46d89d172c 100644
+--- a/res/values-sr/strings.xml
++++ b/res/values-sr/strings.xml
+@@ -1602,6 +1602,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android верзија"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Безбедносно ажурирање за Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Произвођач"</string>
+     <string name="model_info" msgid="8997566254717810904">"Модел"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Верзија хардвера"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ИД опреме"</string>
+diff --git a/res/values-sv/strings.xml b/res/values-sv/strings.xml
+index 5ee9840bcd..ff32eb512e 100644
+--- a/res/values-sv/strings.xml
++++ b/res/values-sv/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android-version"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Säkerhetsuppdatering för Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Tillverkare"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modell"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Maskinvaruversion"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Utrustnings-ID"</string>
+diff --git a/res/values-sw/strings.xml b/res/values-sw/strings.xml
+index 63ea57d8b6..5a7ee99092 100644
+--- a/res/values-sw/strings.xml
++++ b/res/values-sw/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Toleo la Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Sasisho la usalama la Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Mtengenezaji"</string>
+     <string name="model_info" msgid="8997566254717810904">"Muundo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Toleo la maunzi"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Kitambulisho cha Kifaa"</string>
+diff --git a/res/values-ta/strings.xml b/res/values-ta/strings.xml
+index 6b69ab38c4..87247cafa1 100644
+--- a/res/values-ta/strings.xml
++++ b/res/values-ta/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android பதிப்பு"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android பாதுகாப்புப் புதுப்பிப்பு"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"உற்பத்தியாளர்"</string>
+     <string name="model_info" msgid="8997566254717810904">"மாடல்"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"வன்பொருள் பதிப்பு"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"உபகரணத்தின் ஐடி"</string>
+diff --git a/res/values-te/strings.xml b/res/values-te/strings.xml
+index 7e789f3f8e..92882f3331 100644
+--- a/res/values-te/strings.xml
++++ b/res/values-te/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android వెర్షన్"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android సెక్యూరిటీ అప్‌డేట్"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"తయారీదారు"</string>
+     <string name="model_info" msgid="8997566254717810904">"మోడల్"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"హార్డ్‌వేర్ వెర్షన్"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ఉపకరణం ID"</string>
+diff --git a/res/values-th/strings.xml b/res/values-th/strings.xml
+index dcbfd2b008..dab870bdbd 100644
+--- a/res/values-th/strings.xml
++++ b/res/values-th/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"เวอร์ชันของ Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"การอัปเดตความปลอดภัยของ Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"ผู้ผลิต"</string>
+     <string name="model_info" msgid="8997566254717810904">"โมเดล"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"เวอร์ชันฮาร์ดแวร์"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"รหัสอุปกรณ์"</string>
+diff --git a/res/values-tl/strings.xml b/res/values-tl/strings.xml
+index c17f9af34a..b8c06cbcda 100644
+--- a/res/values-tl/strings.xml
++++ b/res/values-tl/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Bersyon ng Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Update sa seguridad ng Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Manufacturer"</string>
+     <string name="model_info" msgid="8997566254717810904">"Modelo"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Bersyon ng hardware"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID ng Kagamitan"</string>
+diff --git a/res/values-tr/strings.xml b/res/values-tr/strings.xml
+index 9196e27b42..5f6ad41249 100644
+--- a/res/values-tr/strings.xml
++++ b/res/values-tr/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android sürümü"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android güvenlik güncellemesi"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Üretici"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Donanım sürümü"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Cihaz Kimliği"</string>
+diff --git a/res/values-uk/strings.xml b/res/values-uk/strings.xml
+index 4d685c2829..e019234eff 100644
+--- a/res/values-uk/strings.xml
++++ b/res/values-uk/strings.xml
+@@ -1627,6 +1627,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Версія Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Оновлення системи безпеки Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Виробник"</string>
+     <string name="model_info" msgid="8997566254717810904">"Модель"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Версія апаратного забезпечення"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Ідентифікатор обладнання"</string>
+diff --git a/res/values-ur/strings.xml b/res/values-ur/strings.xml
+index 874130bb32..654844982a 100644
+--- a/res/values-ur/strings.xml
++++ b/res/values-ur/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"‏Android ورژن"</string>
+     <string name="security_patch" msgid="4071756145347865382">"‏Android سیکیورٹی اپ ڈیٹ"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"مینوفیکچرر"</string>
+     <string name="model_info" msgid="8997566254717810904">"ماڈل"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"ہارڈ ویئر کا ورژن"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"‏آلہ ID"</string>
+diff --git a/res/values-uz/strings.xml b/res/values-uz/strings.xml
+index 35c1754523..a9d720a8d0 100644
+--- a/res/values-uz/strings.xml
++++ b/res/values-uz/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android versiyasi"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android xavfsizlik yangilanishi"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Ishlab chiqaruvchi"</string>
+     <string name="model_info" msgid="8997566254717810904">"Model"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Apparat versiyasi"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"Jihozning nomi"</string>
+diff --git a/res/values-vi/strings.xml b/res/values-vi/strings.xml
+index 13a4210a69..62966af5b6 100644
+--- a/res/values-vi/strings.xml
++++ b/res/values-vi/strings.xml
+@@ -1587,6 +1587,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Phiên bản Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Bản cập nhật bảo mật Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Nhà sản xuất"</string>
+     <string name="model_info" msgid="8997566254717810904">"Kiểu máy"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Phiên bản phần cứng"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"ID thiết bị"</string>
+diff --git a/res/values-zh-rCN/strings.xml b/res/values-zh-rCN/strings.xml
+index 677b88fcdf..9ef31074e0 100644
+--- a/res/values-zh-rCN/strings.xml
++++ b/res/values-zh-rCN/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android 版本"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android 安全更新"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"制造商"</string>
+     <string name="model_info" msgid="8997566254717810904">"型号"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"硬件版本"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"设备 ID"</string>
+diff --git a/res/values-zh-rHK/strings.xml b/res/values-zh-rHK/strings.xml
+index 4ba199c805..54eb10eca5 100644
+--- a/res/values-zh-rHK/strings.xml
++++ b/res/values-zh-rHK/strings.xml
+@@ -1583,6 +1583,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android 版本"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android 安全性更新"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"製造商"</string>
+     <string name="model_info" msgid="8997566254717810904">"型號"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"硬件版本"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"設備編號"</string>
+diff --git a/res/values-zh-rTW/strings.xml b/res/values-zh-rTW/strings.xml
+index 47b6704565..0cc4d7d42e 100644
+--- a/res/values-zh-rTW/strings.xml
++++ b/res/values-zh-rTW/strings.xml
+@@ -1583,6 +1583,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Android 版本"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Android 安全性更新"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"製造商"</string>
+     <string name="model_info" msgid="8997566254717810904">"型號"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"硬體版本"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"設備 ID"</string>
+diff --git a/res/values-zu/strings.xml b/res/values-zu/strings.xml
+index e83e08989a..54f1c969fb 100644
+--- a/res/values-zu/strings.xml
++++ b/res/values-zu/strings.xml
+@@ -1581,6 +1581,7 @@
+     <string name="system_update_settings_list_item_summary" msgid="6703752298349642101"></string>
+     <string name="firmware_version" msgid="1606901586501447275">"Inguqulo ye-Android"</string>
+     <string name="security_patch" msgid="4071756145347865382">"Isibuyekezo sokuvikela kwe-Android"</string>
++    <string name="device_manufacturer" msgid="3516742885166545865">"Umkhiqizi"</string>
+     <string name="model_info" msgid="8997566254717810904">"Imodeli"</string>
+     <string name="hardware_revision" msgid="3454709180861965025">"Inguqulo yezingxenyekazi zekhompuyutha"</string>
+     <string name="fcc_equipment_id" msgid="6596668314025646129">"I-ID yempahla"</string>
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index b8a5202f13..d6e7eaf041 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -3506,6 +3506,8 @@
+     <!-- About phone screen, status item label  [CHAR LIMIT=60] -->
+     <string name="security_patch">Android security update</string>
+     <!-- About phone screen, status item label  [CHAR LIMIT=40] -->
++    <string name="device_manufacturer">Manufacturer</string>
++    <!-- About phone screen, status item label  [CHAR LIMIT=40] -->
+     <string name="model_info">Model</string>
+     <!-- Label for device's hardware revision value [CHAR LIMIT=40] -->
+     <string name="hardware_revision">Hardware version</string>
+diff --git a/res/xml/hardware_info.xml b/res/xml/hardware_info.xml
+index 641f707a65..7d1ea2fbf0 100644
+--- a/res/xml/hardware_info.xml
++++ b/res/xml/hardware_info.xml
+@@ -21,6 +21,14 @@
+     android:title="@string/model_info"
+     settings:keywords="@string/keywords_model_and_hardware">
+ 
++    <!-- Device manufacturer -->
++    <Preference
++        android:key="hardware_info_device_manufacturer"
++        android:title="@string/device_manufacturer"
++        android:summary="@string/summary_placeholder"
++        settings:controller="com.android.settings.deviceinfo.hardwareinfo.DeviceManufacturerPreferenceController"
++        settings:enableCopying="true"/>
++
+     <!-- Model -->
+     <Preference
+         android:key="hardware_info_device_model"
+diff --git a/src/com/android/settings/deviceinfo/hardwareinfo/DeviceManufacturerPreferenceController.java b/src/com/android/settings/deviceinfo/hardwareinfo/DeviceManufacturerPreferenceController.java
+new file mode 100644
+index 0000000000..96c0d5188a
+--- /dev/null
++++ b/src/com/android/settings/deviceinfo/hardwareinfo/DeviceManufacturerPreferenceController.java
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (C) 2019 The Android-x86 Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.deviceinfo.hardwareinfo;
++
++import android.content.Context;
++import android.os.Build;
++
++import com.android.settings.deviceinfo.HardwareInfoPreferenceController;
++
++public class DeviceManufacturerPreferenceController extends HardwareInfoPreferenceController {
++
++    public DeviceManufacturerPreferenceController(Context context, String key) {
++        super(context, key);
++    }
++
++    @Override
++    public int getAvailabilityStatus() {
++        final int availability = super.getAvailabilityStatus();
++        if (availability == AVAILABLE_UNSEARCHABLE) {
++            return AVAILABLE;
++        }
++        return availability;
++    }
++
++    @Override
++    public boolean isSliceable() {
++        return true;
++    }
++
++    @Override
++    public CharSequence getSummary() {
++        return Build.MANUFACTURER;
++    }
++
++    @Override
++    public boolean useDynamicSliceSummary() {
++        return true;
++    }
++}

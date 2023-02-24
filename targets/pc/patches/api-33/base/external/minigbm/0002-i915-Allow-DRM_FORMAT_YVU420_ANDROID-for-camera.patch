@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Wed, 23 Mar 2022 19:52:33 +0100
+Subject: [PATCH 2/2] i915: Allow DRM_FORMAT_YVU420_ANDROID for camera
+
+Change-Id: I0837578dc0f3b7a43473226eaf41b32c8791e700
+---
+ i915.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/i915.c b/i915.c
+index d2b3d19..144185e 100644
+--- a/i915.c
++++ b/i915.c
+@@ -226,6 +226,12 @@ static int i915_add_combinations(struct driver *drv)
+ 				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+ 				   hw_protected);
+ 
++	/* YVU420_ANDROID format for camera, display, decoding and encoding (needed for camera on Android 12). */
++	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata_linear,
++			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
++				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
++				   hw_protected);
++
+ 	/* Android CTS tests require this. */
+ 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
+ 

@@ -1,0 +1,1849 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Tue, 27 Sep 2022 18:23:41 +0200
+Subject: [PATCH 04/13] Reimplement extractor without internal thread
+
+There were race conditions when seeking (conflict between flushing
+packet queues and posting EOF marker on the same queue). This
+reimplements the extractor without an internal thread, similar to other
+AOSP extractors. Packets are fetched on-demand and audio/video queues
+are populated simultaneously.
+
+Also consolidate the logging and naming conventions in the code.
+---
+ extractor/FFmpegExtractor.cpp | 946 ++++++++++++++--------------------
+ extractor/FFmpegExtractor.h   |  51 +-
+ utils/ffmpeg_source.cpp       |   9 +-
+ utils/ffmpeg_utils.cpp        |  18 +-
+ utils/ffmpeg_utils.h          |   4 +-
+ 5 files changed, 412 insertions(+), 616 deletions(-)
+
+diff --git a/extractor/FFmpegExtractor.cpp b/extractor/FFmpegExtractor.cpp
+index 5ffd8fb..a46f87c 100644
+--- a/extractor/FFmpegExtractor.cpp
++++ b/extractor/FFmpegExtractor.cpp
+@@ -113,9 +113,7 @@ private:
+ 
+ FFmpegExtractor::FFmpegExtractor(DataSourceHelper *source, const sp<AMessage> &meta)
+     : mDataSource(source),
+-      mInitCheck(NO_INIT),
+       mFormatCtx(NULL),
+-      mReaderThreadStarted(false),
+       mParsedMetadata(false) {
+     ALOGV("FFmpegExtractor::FFmpegExtractor");
+ 
+@@ -131,30 +129,40 @@ FFmpegExtractor::FFmpegExtractor(DataSourceHelper *source, const sp<AMessage> &m
+         return;
+     }
+ 
+-    // start reader here, as we want to extract extradata from bitstream if no extradata
+-    startReaderThread();
+-
+-    while(mProbePkts <= EXTRACTOR_MAX_PROBE_PACKETS && !mEOF &&
+-        (mFormatCtx->pb ? !mFormatCtx->pb->error : 1) &&
+-        (mDefersToCreateVideoTrack || mDefersToCreateAudioTrack)) {
+-        ALOGV("mProbePkts=%zu", mProbePkts);
+-        usleep(5000);
++    while (mPktCounter <= EXTRACTOR_MAX_PROBE_PACKETS &&
++           (mDefersToCreateVideoTrack || mDefersToCreateAudioTrack)) {
++        err = feedNextPacket();
++        if (err < 0 && err != AVERROR(EAGAIN)) {
++            ALOGE("deferred track creation failed, %s (%08x)", av_err2str(err), err);
++            return;
++        }
+     }
+ 
+-    ALOGV("mProbePkts: %zu, mEOF: %d, pb->error(if has): %d, mDefersToCreateVideoTrack: %d, mDefersToCreateAudioTrack: %d",
+-        mProbePkts, mEOF, mFormatCtx->pb ? mFormatCtx->pb->error : 0, mDefersToCreateVideoTrack, mDefersToCreateAudioTrack);
++    ALOGV("mPktCounter: %zu, mEOF: %d, pb->error(if has): %d, mDefersToCreateVideoTrack: %d, mDefersToCreateAudioTrack: %d",
++          mPktCounter, mEOF, mFormatCtx->pb ? mFormatCtx->pb->error : 0, mDefersToCreateVideoTrack, mDefersToCreateAudioTrack);
++
++    if (mDefersToCreateVideoTrack) {
++        ALOGW("deferred creation of video track failed, disabling stream");
++        streamComponentClose(mVideoStreamIdx);
++    }
+ 
+-    mInitCheck = OK;
++    if (mDefersToCreateAudioTrack) {
++        ALOGW("deferred creation of audio track failed, disabling stream");
++        streamComponentClose(mAudioStreamIdx);
++    }
+ }
+ 
+ FFmpegExtractor::~FFmpegExtractor() {
+     ALOGV("FFmpegExtractor::~FFmpegExtractor");
+-    // stop reader here if no track!
+-    stopReaderThread();
+ 
+-    Mutex::Autolock autoLock(mLock);
++    mAbortRequest = 1;
+     deInitStreams();
+ 
++    Mutex::Autolock autoLock(mLock);
++
++    packet_queue_destroy(&mVideoQ);
++    packet_queue_destroy(&mAudioQ);
++
+     for (auto& trackInfo : mTracks) {
+         AMediaFormat_delete(trackInfo.mMeta);
+     }
+@@ -162,16 +170,12 @@ FFmpegExtractor::~FFmpegExtractor() {
+ }
+ 
+ size_t FFmpegExtractor::countTracks() {
+-    return mInitCheck == OK ? mTracks.size() : 0;
++    return mTracks.size();
+ }
+ 
+ MediaTrackHelper* FFmpegExtractor::getTrack(size_t index) {
+     ALOGV("FFmpegExtractor::getTrack[%zu]", index);
+ 
+-    if (mInitCheck != OK) {
+-        return NULL;
+-    }
+-
+     if (index >= mTracks.size()) {
+         return NULL;
+     }
+@@ -182,10 +186,6 @@ MediaTrackHelper* FFmpegExtractor::getTrack(size_t index) {
+ media_status_t FFmpegExtractor::getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags __unused) {
+     ALOGV("FFmpegExtractor::getTrackMetaData[%zu]", index);
+ 
+-    if (mInitCheck != OK) {
+-        return AMEDIA_ERROR_UNKNOWN;
+-    }
+-
+     if (index >= mTracks.size()) {
+         return AMEDIA_ERROR_UNKNOWN;
+     }
+@@ -204,10 +204,6 @@ media_status_t FFmpegExtractor::getTrackMetaData(AMediaFormat *meta, size_t inde
+ media_status_t FFmpegExtractor::getMetaData(AMediaFormat *meta) {
+     ALOGV("FFmpegExtractor::getMetaData");
+ 
+-    if (mInitCheck != OK) {
+-        return AMEDIA_ERROR_UNKNOWN;
+-    }
+-
+     if (!mParsedMetadata) {
+         parseMetadataTags(mFormatCtx, mMeta);
+         mParsedMetadata = true;
+@@ -220,10 +216,6 @@ media_status_t FFmpegExtractor::getMetaData(AMediaFormat *meta) {
+ uint32_t FFmpegExtractor::flags() const {
+     ALOGV("FFmpegExtractor::flags");
+ 
+-    if (mInitCheck != OK) {
+-        return 0;
+-    }
+-
+     uint32_t flags = CAN_PAUSE;
+ 
+     if (mFormatCtx->duration != AV_NOPTS_VALUE) {
+@@ -233,7 +225,7 @@ uint32_t FFmpegExtractor::flags() const {
+     return flags;
+ }
+ 
+-int FFmpegExtractor::check_extradata(AVCodecParameters *avpar)
++int FFmpegExtractor::checkExtradata(AVCodecParameters *avpar)
+ {
+     enum AVCodecID codec_id = AV_CODEC_ID_NONE;
+     const char *name = NULL;
+@@ -264,7 +256,7 @@ int FFmpegExtractor::check_extradata(AVCodecParameters *avpar)
+     if (codec_id != AV_CODEC_ID_AAC) {
+         int is_compatible = is_extradata_compatible_with_android(avpar);
+         if (!is_compatible) {
+-            ALOGI("%s extradata is not compatible with android, should to extract it from bitstream",
++            ALOGI("[%s] extradata is not compatible with android, should to extract it from bitstream",
+                     av_get_media_type_string(avpar->codec_type));
+             *defersToCreateTrack = true;
+             *bsfc = NULL; // H264 don't need bsfc, only AAC?
+@@ -278,30 +270,30 @@ int FFmpegExtractor::check_extradata(AVCodecParameters *avpar)
+     }
+ 
+     if (avpar->extradata_size <= 0) {
+-        ALOGI("No %s extradata found, should to extract it from bitstream",
+-                av_get_media_type_string(avpar->codec_type));
++        const char* type = av_get_media_type_string(avpar->codec_type);
++        ALOGI("[%s] no extradata found, extract it from bitstream", type);
+         *defersToCreateTrack = true;
+          //CHECK(name != NULL);
+         if (!*bsfc && name) {
+             const AVBitStreamFilter* bsf = av_bsf_get_by_name(name);
+             if (!bsf) {
+-                ALOGE("[%s] cannot find bitstream filter", name);
++                ALOGE("[%s] (%s) cannot find bitstream filter", type, name);
+                 *defersToCreateTrack = false;
+                 return -1;
+             }
+             if (av_bsf_alloc(bsf, bsfc) < 0 || !*bsfc) {
+-                ALOGE("[%s] cannot allocate bitstream filter", name);
++                ALOGE("[%s] (%s) cannot allocate bitstream filter", type, name);
+                 *defersToCreateTrack = false;
+                 return -1;
+             }
+             // (*bsfc)->time_base_in = avpar->time_base;
+             if (avcodec_parameters_copy((*bsfc)->par_in, avpar)
+                     || av_bsf_init(*bsfc)) {
+-                ALOGE("[%s] cannot initialize bitstream filter", name);
++                ALOGE("[%s] (%s) cannot initialize bitstream filter", type, name);
+                 *defersToCreateTrack = false;
+                 return -1;
+             }
+-            ALOGV("[%s] created bitstream filter", name);
++            ALOGV("[%s] (%s) created bitstream filter", type, name);
+             return 0;
+         } else {
+             return 0;
+@@ -310,7 +302,7 @@ int FFmpegExtractor::check_extradata(AVCodecParameters *avpar)
+     return 1;
+ }
+ 
+-void FFmpegExtractor::printTime(int64_t time)
++static void printTime(int64_t time, const char* type)
+ {
+     int hours, mins, secs, us;
+ 
+@@ -323,14 +315,12 @@ void FFmpegExtractor::printTime(int64_t time)
+     secs %= 60;
+     hours = mins / 60;
+     mins %= 60;
+-    ALOGI("the time is %02d:%02d:%02d.%02d",
+-        hours, mins, secs, (100 * us) / AV_TIME_BASE);
++    ALOGI("[%s] the time is %02d:%02d:%02d.%02d",
++          type, hours, mins, secs, (100 * us) / AV_TIME_BASE);
+ }
+ 
+-bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
++bool FFmpegExtractor::isCodecSupported(enum AVCodecID codec_id)
+ {
+-    bool supported = false;
+-
+     switch(codec_id) {
+     case AV_CODEC_ID_H264:
+     case AV_CODEC_ID_MPEG4:
+@@ -364,19 +354,10 @@ bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
+     case AV_CODEC_ID_VORBIS:
+     case AV_CODEC_ID_HEVC:
+     case AV_CODEC_ID_ALAC:
+-
+-        supported = true;
+-        break;
++        return true;
+     default:
+-        ALOGD("unsupported codec (%s), but give it a chance",
+-                avcodec_get_name(codec_id));
+-        //Won't promise that the following codec id can be supported.
+-        //Just give these codecs a chance.
+-        supported = true;
+-        break;
++        return false;
+     }
+-
+-    return supported;
+ }
+ 
+ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *meta)
+@@ -441,7 +422,7 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
+         ret = setVP9Format(avpar, meta);
+         break;
+     default:
+-        ALOGD("unsupported video codec (id: %d, name: %s), but give it a chance",
++        ALOGD("[video] unsupported codec (id: %d, name: %s), but give it a chance",
+                 avpar->codec_id, avcodec_get_name(avpar->codec_id));
+         AMediaFormat_setInt32(meta, "codec-id", avpar->codec_id);
+         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_FFMPEG);
+@@ -486,7 +467,7 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
+         height = avpar->height;
+         width = ((int)rint(height * aspect_ratio)) & ~1;
+ 
+-        ALOGI("width: %d, height: %d, bit_rate: % " PRId64 " aspect ratio: %f",
++        ALOGI("[video] width: %d, height: %d, bit_rate: % " PRId64 " aspect ratio: %f",
+                 avpar->width, avpar->height, avpar->bit_rate, aspect_ratio);
+ 
+         AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_WIDTH, avpar->width);
+@@ -495,7 +476,7 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
+             ((avpar->width != width || avpar->height != height))) {
+             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAR_WIDTH, width);
+             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAR_HEIGHT, height);
+-            ALOGI("SAR width: %d, SAR height: %d", width, height);
++            ALOGI("[video] SAR width: %d, SAR height: %d", width, height);
+         }
+         if (avpar->bit_rate > 0) {
+             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avpar->bit_rate);
+@@ -559,7 +540,7 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
+         ret = setALACFormat(avpar, meta);
+         break;
+     default:
+-        ALOGD("unsupported audio codec (id: %d, name: %s), but give it a chance",
++        ALOGD("[audio] unsupported codec (id: %d, name: %s), but give it a chance",
+                 avpar->codec_id, avcodec_get_name(avpar->codec_id));
+         AMediaFormat_setInt32(meta, "codec-id", avpar->codec_id);
+         AMediaFormat_setInt32(meta, "coded-sample-bits", avpar->bits_per_coded_sample);
+@@ -572,7 +553,7 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
+     }
+ 
+     if (ret == AMEDIA_OK) {
+-        ALOGD("bit_rate: %" PRId64 ", sample_rate: %d, channels: %d, "
++        ALOGD("[audio] bit_rate: %" PRId64 ", sample_rate: %d, channels: %d, "
+                 "bits_per_coded_sample: %d, block_align: %d "
+                 "bits_per_raw_sample: %d, sample_format: %d",
+                 avpar->bit_rate, avpar->sample_rate, avpar->channels,
+@@ -602,12 +583,12 @@ void FFmpegExtractor::setDurationMetaData(AVStream *stream, AMediaFormat *meta)
+ 
+     if (stream->duration != AV_NOPTS_VALUE) {
+         int64_t duration = av_rescale_q(stream->duration, stream->time_base, AV_TIME_BASE_Q);
+-        printTime(duration);
+         const char *s = av_get_media_type_string(avpar->codec_type);
++        printTime(duration, s);
+         if (stream->start_time != AV_NOPTS_VALUE) {
+-            ALOGV("%s startTime: %" PRId64, s, stream->start_time);
++            ALOGV("[%s] startTime: %" PRId64, s, stream->start_time);
+         } else {
+-            ALOGV("%s startTime:N/A", s);
++            ALOGV("[%s] startTime:N/A", s);
+         }
+         AMediaFormat_setInt64(meta, AMEDIAFORMAT_KEY_DURATION, duration);
+     } else {
+@@ -616,123 +597,131 @@ void FFmpegExtractor::setDurationMetaData(AVStream *stream, AMediaFormat *meta)
+     }
+ }
+ 
+-int FFmpegExtractor::stream_component_open(int stream_index)
++int FFmpegExtractor::streamComponentOpen(int streamIndex)
+ {
+     TrackInfo *trackInfo = NULL;
+     AVCodecParameters *avpar = NULL;
+     bool supported = false;
+     int ret = 0;
+ 
+-    ALOGI("stream_index: %d", stream_index);
+-    if (stream_index < 0 || stream_index >= (int)mFormatCtx->nb_streams)
++    if (streamIndex < 0 || streamIndex >= (int)mFormatCtx->nb_streams) {
++        ALOGE("opening stream with invalid stream index(%d)", streamIndex);
+         return -1;
+-    avpar = mFormatCtx->streams[stream_index]->codecpar;
++    }
++    avpar = mFormatCtx->streams[streamIndex]->codecpar;
+ 
+-    supported = is_codec_supported(avpar->codec_id);
++    const char* type = av_get_media_type_string(avpar->codec_type);
++    ALOGI("[%s] opening stream @ index(%d)", type, streamIndex);
+ 
+-    if (!supported) {
+-        ALOGE("unsupport the codec(%s)", avcodec_get_name(avpar->codec_id));
+-        return -1;
+-    } else if ((mFormatCtx->streams[stream_index]->disposition & AV_DISPOSITION_ATTACHED_PIC) ||
+-                avpar->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
+-        ALOGD("not opening attached picture(%s)", avcodec_get_name(avpar->codec_id));
++    supported = isCodecSupported(avpar->codec_id);
++    if (! supported) {
++        ALOGD("[%s] unsupported codec (%s), but give it a chance",
++              type, avcodec_get_name(avpar->codec_id));
++    }
++
++    if ((mFormatCtx->streams[streamIndex]->disposition & AV_DISPOSITION_ATTACHED_PIC) ||
++        avpar->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
++        ALOGD("[%s] not opening attached picture(%s)", type, avcodec_get_name(avpar->codec_id));
+         return -1;
+     }
+-    ALOGI("support the codec(%s) disposition(%x)", avcodec_get_name(avpar->codec_id), mFormatCtx->streams[stream_index]->disposition);
++    ALOGI("[%s] support the codec(%s) disposition(%x)",
++          type, avcodec_get_name(avpar->codec_id), mFormatCtx->streams[streamIndex]->disposition);
+ 
+     for (size_t i = 0; i < mTracks.size(); ++i) {
+-        if (stream_index == mTracks.editItemAt(i).mIndex) {
+-            ALOGE("this track already exists");
++        if (streamIndex == mTracks.editItemAt(i).mIndex) {
++            ALOGE("[%s] this track already exists", type);
+             return 0;
+         }
+     }
+ 
+-    mFormatCtx->streams[stream_index]->discard = AVDISCARD_DEFAULT;
++    mFormatCtx->streams[streamIndex]->discard = AVDISCARD_DEFAULT;
+ 
+-    ALOGV("Tag %s/0x%08x with codec(%s)\n",
+-          av_fourcc2str(avpar->codec_tag), avpar->codec_tag, avcodec_get_name(avpar->codec_id));
++    ALOGV("[%s] tag %s/0x%08x with codec(%s)\n",
++          type, av_fourcc2str(avpar->codec_tag), avpar->codec_tag, avcodec_get_name(avpar->codec_id));
+ 
+     AMediaFormat *meta = AMediaFormat_new();
+ 
+     switch (avpar->codec_type) {
+     case AVMEDIA_TYPE_VIDEO:
+         if (mVideoStreamIdx == -1)
+-            mVideoStreamIdx = stream_index;
++            mVideoStreamIdx = streamIndex;
+         if (mVideoStream == NULL)
+-            mVideoStream = mFormatCtx->streams[stream_index];
++            mVideoStream = mFormatCtx->streams[streamIndex];
+ 
+-        ret = check_extradata(avpar);
++        ret = checkExtradata(avpar);
+         if (ret != 1) {
+             if (ret == -1) {
+                 // disable the stream
+                 mVideoStreamIdx = -1;
+                 mVideoStream = NULL;
+                 packet_queue_flush(&mVideoQ);
+-                mFormatCtx->streams[stream_index]->discard = AVDISCARD_ALL;
++                mFormatCtx->streams[streamIndex]->discard = AVDISCARD_ALL;
+             }
+             return ret;
+          }
+ #if DEBUG_EXTRADATA
+         if (avpar->extradata) {
+-            ALOGV("video stream extradata:");
++            ALOGV("[%s] stream extradata(%d):", type, avpar->extradata_size);
+             hexdump(avpar->extradata, avpar->extradata_size);
+         } else {
+-            ALOGV("video stream no extradata, but we can ignore it.");
++            ALOGV("[%s] stream has no extradata, but we can ignore it.", type);
+         }
+ #endif
+         if (setVideoFormat(mVideoStream, meta) != AMEDIA_OK) {
+-            ALOGE("setVideoFormat failed");
++            ALOGE("[%s] setVideoFormat failed", type);
+             return -1;
+         }
+ 
+-        ALOGV("create a video track");
++        ALOGV("[%s] creating track", type);
+         mTracks.push();
+         trackInfo = &mTracks.editItemAt(mTracks.size() - 1);
+-        trackInfo->mIndex  = stream_index;
++        trackInfo->mIndex  = streamIndex;
+         trackInfo->mMeta   = meta;
+         trackInfo->mStream = mVideoStream;
+         trackInfo->mQueue  = &mVideoQ;
++        trackInfo->mSeek   = false;
+ 
+         mDefersToCreateVideoTrack = false;
+ 
+         break;
+     case AVMEDIA_TYPE_AUDIO:
+         if (mAudioStreamIdx == -1)
+-            mAudioStreamIdx = stream_index;
++            mAudioStreamIdx = streamIndex;
+         if (mAudioStream == NULL)
+-            mAudioStream = mFormatCtx->streams[stream_index];
++            mAudioStream = mFormatCtx->streams[streamIndex];
+ 
+-        ret = check_extradata(avpar);
++        ret = checkExtradata(avpar);
+         if (ret != 1) {
+             if (ret == -1) {
+                 // disable the stream
+                 mAudioStreamIdx = -1;
+                 mAudioStream = NULL;
+                 packet_queue_flush(&mAudioQ);
+-                mFormatCtx->streams[stream_index]->discard = AVDISCARD_ALL;
++                mFormatCtx->streams[streamIndex]->discard = AVDISCARD_ALL;
+             }
+             return ret;
+         }
+ #if DEBUG_EXTRADATA
+         if (avpar->extradata) {
+-            ALOGV("audio stream extradata(%d):", avpar->extradata_size);
++            ALOGV("[%s] stream extradata(%d):", type, avpar->extradata_size);
+             hexdump(avpar->extradata, avpar->extradata_size);
+         } else {
+-            ALOGV("audio stream no extradata, but we can ignore it.");
++            ALOGV("[%s] stream has no extradata, but we can ignore it.", type);
+         }
+ #endif
+         if (setAudioFormat(mAudioStream, meta) != AMEDIA_OK) {
+-            ALOGE("setAudioFormat failed");
++            ALOGE("[%s] setAudioFormat failed", type);
+             return -1;
+         }
+ 
+-        ALOGV("create a audio track");
++        ALOGV("[%s] creating track", type);
+         mTracks.push();
+         trackInfo = &mTracks.editItemAt(mTracks.size() - 1);
+-        trackInfo->mIndex  = stream_index;
++        trackInfo->mIndex  = streamIndex;
+         trackInfo->mMeta   = meta;
+         trackInfo->mStream = mAudioStream;
+         trackInfo->mQueue  = &mAudioQ;
++        trackInfo->mSeek   = false;
+ 
+         mDefersToCreateAudioTrack = false;
+ 
+@@ -748,25 +737,30 @@ int FFmpegExtractor::stream_component_open(int stream_index)
+     return 0;
+ }
+ 
+-void FFmpegExtractor::stream_component_close(int stream_index)
++void FFmpegExtractor::streamComponentClose(int streamIndex)
+ {
+     AVCodecParameters *avpar;
+ 
+-    if (stream_index < 0 || stream_index >= (int)mFormatCtx->nb_streams)
++    if (streamIndex < 0 || streamIndex >= (int)mFormatCtx->nb_streams) {
++        ALOGE("closing stream with invalid index(%d)", streamIndex);
+         return;
+-    avpar = mFormatCtx->streams[stream_index]->codecpar;
++    }
++    avpar = mFormatCtx->streams[streamIndex]->codecpar;
++
++    const char* type = av_get_media_type_string(avpar->codec_type);
++    ALOGI("[%s] closing stream @ index(%d)", type, streamIndex);
+ 
+     switch (avpar->codec_type) {
+     case AVMEDIA_TYPE_VIDEO:
+-        ALOGV("packet_queue_abort videoq");
++        ALOGV("[%s] packet_queue_abort", type);
+         packet_queue_abort(&mVideoQ);
+-        ALOGV("packet_queue_end videoq");
++        ALOGV("[%s] packet_queue_end", type);
+         packet_queue_flush(&mVideoQ);
+         break;
+     case AVMEDIA_TYPE_AUDIO:
+-        ALOGV("packet_queue_abort audioq");
++        ALOGV("[%s] packet_queue_abort", type);
+         packet_queue_abort(&mAudioQ);
+-        ALOGV("packet_queue_end audioq");
++        ALOGV("[%s] packet_queue_end", type);
+         packet_queue_flush(&mAudioQ);
+         break;
+     case AVMEDIA_TYPE_SUBTITLE:
+@@ -775,7 +769,7 @@ void FFmpegExtractor::stream_component_close(int stream_index)
+         break;
+     }
+ 
+-    mFormatCtx->streams[stream_index]->discard = AVDISCARD_ALL;
++    mFormatCtx->streams[streamIndex]->discard = AVDISCARD_ALL;
+     switch (avpar->codec_type) {
+     case AVMEDIA_TYPE_VIDEO:
+         mVideoStream    = NULL;
+@@ -783,6 +777,7 @@ void FFmpegExtractor::stream_component_close(int stream_index)
+         if (mVideoBsfc) {
+             av_bsf_free(&mVideoBsfc);
+         }
++        mDefersToCreateVideoTrack = false;
+         break;
+     case AVMEDIA_TYPE_AUDIO:
+         mAudioStream    = NULL;
+@@ -790,6 +785,7 @@ void FFmpegExtractor::stream_component_close(int stream_index)
+         if (mAudioBsfc) {
+             av_bsf_free(&mAudioBsfc);
+         }
++        mDefersToCreateAudioTrack = false;
+         break;
+     case AVMEDIA_TYPE_SUBTITLE:
+         break;
+@@ -798,72 +794,71 @@ void FFmpegExtractor::stream_component_close(int stream_index)
+     }
+ }
+ 
+-void FFmpegExtractor::reachedEOS(enum AVMediaType media_type)
+-{
+-    Mutex::Autolock autoLock(mLock);
+-
+-    if (media_type == AVMEDIA_TYPE_VIDEO) {
+-        mVideoEOSReceived = true;
+-    } else if (media_type == AVMEDIA_TYPE_AUDIO) {
+-        mAudioEOSReceived = true;
+-    }
+-    mCondition.signal();
+-}
+-
+ /* seek in the stream */
+-int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type,
++int FFmpegExtractor::streamSeek(int trackIndex, int64_t pos,
+         MediaTrackHelper::ReadOptions::SeekMode mode)
+ {
+     Mutex::Autolock _l(mLock);
+ 
+-    if (mSeekIdx >= 0 || (mVideoStreamIdx >= 0
+-            && mAudioStreamIdx >= 0
+-            && media_type == AVMEDIA_TYPE_AUDIO
+-            && !mVideoEOSReceived)) {
+-       return NO_SEEK;
+-    }
+-
+-    // flush immediately
+-    if (mAudioStreamIdx >= 0)
+-        packet_queue_flush(&mAudioQ);
+-    if (mVideoStreamIdx >= 0)
+-        packet_queue_flush(&mVideoQ);
++    const TrackInfo& track = mTracks.itemAt(trackIndex);
++    const char* type = av_get_media_type_string(track.mStream->codecpar->codec_type);
+ 
+-    mSeekIdx = media_type == AVMEDIA_TYPE_VIDEO ? mVideoStreamIdx : mAudioStreamIdx;
+-    mSeekPos = pos;
++    if (track.mSeek) {
++        // Don't do anything if seeking is already in progress
++        ALOGV("[%s] seek already in progress",
++              av_get_media_type_string(track.mStream->codecpar->codec_type));
++        return NO_SEEK;
++    }
+ 
+-    //mSeekFlags &= ~AVSEEK_FLAG_BYTE;
+-    //if (mSeekByBytes) {
+-    //    mSeekFlags |= AVSEEK_FLAG_BYTE;
+-    //}
++    int64_t seekPos = pos, seekMin, seekMax;
++    int err;
+ 
+     switch (mode) {
+         case MediaTrackHelper::ReadOptions::SEEK_PREVIOUS_SYNC:
+-            mSeekMin = 0;
+-            mSeekMax = mSeekPos;
++            seekMin = 0;
++            seekMax = seekPos;
+             break;
+         case MediaTrackHelper::ReadOptions::SEEK_NEXT_SYNC:
+-            mSeekMin = mSeekPos;
+-            mSeekMax = INT64_MAX;
++            seekMin = seekPos;
++            seekMax = INT64_MAX;
+             break;
+         case MediaTrackHelper::ReadOptions::SEEK_CLOSEST_SYNC:
+-            mSeekMin = 0;
+-            mSeekMax = INT64_MAX;
++            seekMin = 0;
++            seekMax = INT64_MAX;
+             break;
+         case MediaTrackHelper::ReadOptions::SEEK_CLOSEST:
+-            mSeekMin = 0;
+-            mSeekMax = mSeekPos;
++            seekMin = 0;
++            seekMax = seekPos;
+             break;
+         default:
+             TRESPASS();
+     }
+ 
+-    mCondition.wait(mLock);
++    err = avformat_seek_file(mFormatCtx, -1, seekMin, seekPos, seekMax, 0);
++    if (err < 0) {
++        ALOGE("[%s] seek failed(%s (%08x)), restarting at the beginning",
++              type, av_err2str(err), err);
++        err = avformat_seek_file(mFormatCtx, -1, 0, 0, 0, 0);
++        if (err < 0) {
++            ALOGE("[%s] seek failed(%s (%08x))", type, av_err2str(err), err);
++            return NO_SEEK;
++        }
++    }
++
++    ALOGV("[%s] (seek) pos=%" PRId64 ", min=%" PRId64 ", max=%" PRId64,
++          type, seekPos, seekMin, seekMax);
++
++    mEOF = false;
++    for (int i = 0; i < mTracks.size(); i++) {
++        TrackInfo& ti = mTracks.editItemAt(i);
++        packet_queue_flush(ti.mQueue);
++        ti.mSeek = true;
++    }
++
+     return SEEK;
+ }
+ 
+-// staitc
+-int FFmpegExtractor::decode_interrupt_cb(void *ctx)
++int FFmpegExtractor::decodeInterruptCb(void *ctx)
+ {
+     FFmpegExtractor *extractor = static_cast<FFmpegExtractor *>(ctx);
+     return extractor->mAbortRequest;
+@@ -904,10 +899,6 @@ void FFmpegExtractor::setFFmpegDefaultOpts()
+     mShowStatus   = 0;
+     mSeekByBytes  = 0; /* seek by bytes 0=off 1=on -1=auto" */
+     mDuration     = AV_NOPTS_VALUE;
+-    mSeekPos      = AV_NOPTS_VALUE;
+-    mSeekMin      = INT64_MIN;
+-    mSeekMax      = INT64_MAX;
+-    mLoop         = 1;
+ 
+     mVideoStreamIdx = -1;
+     mAudioStreamIdx = -1;
+@@ -919,12 +910,8 @@ void FFmpegExtractor::setFFmpegDefaultOpts()
+     mAudioBsfc = NULL;
+ 
+     mAbortRequest = 0;
+-    mPaused       = 0;
+-    mLastPaused   = 0;
+-    mProbePkts    = 0;
++    mPktCounter   = 0;
+     mEOF          = false;
+-
+-    mSeekIdx      = -1;
+ }
+ 
+ int FFmpegExtractor::initStreams()
+@@ -952,12 +939,12 @@ int FFmpegExtractor::initStreams()
+         ret = -1;
+         goto fail;
+     }
+-    mFormatCtx->interrupt_callback.callback = decode_interrupt_cb;
++    mFormatCtx->interrupt_callback.callback = decodeInterruptCb;
+     mFormatCtx->interrupt_callback.opaque = this;
+     ALOGV("mFilename: %s", mFilename);
+     err = avformat_open_input(&mFormatCtx, mFilename, NULL, &format_opts);
+     if (err < 0) {
+-        ALOGE("%s: avformat_open_input failed, err:%s", mFilename, av_err2str(err));
++        ALOGE("avformat_open_input(%s) failed: %s (%08x)", mFilename, av_err2str(err), err);
+         ret = -1;
+         goto fail;
+     }
+@@ -980,7 +967,7 @@ int FFmpegExtractor::initStreams()
+ 
+     err = avformat_find_stream_info(mFormatCtx, opts);
+     if (err < 0) {
+-        ALOGE("%s: could not find stream info, err:%s", mFilename, av_err2str(err));
++        ALOGE("avformat_find_stream_info(%s) failed: %s (%08x)", mFilename, av_err2str(err), err);
+         ret = -1;
+         goto fail;
+     }
+@@ -1030,19 +1017,19 @@ int FFmpegExtractor::initStreams()
+     }
+ 
+     if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
+-        audio_ret = stream_component_open(st_index[AVMEDIA_TYPE_AUDIO]);
++        audio_ret = streamComponentOpen(st_index[AVMEDIA_TYPE_AUDIO]);
+         if (audio_ret >= 0)
+             packet_queue_start(&mAudioQ);
+     }
+ 
+     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
+-        video_ret = stream_component_open(st_index[AVMEDIA_TYPE_VIDEO]);
++        video_ret = streamComponentOpen(st_index[AVMEDIA_TYPE_VIDEO]);
+         if (video_ret >= 0)
+             packet_queue_start(&mVideoQ);
+     }
+ 
+-    if ( audio_ret < 0 && video_ret < 0) {
+-        ALOGE("%s: could not open codecs\n", mFilename);
++    if (audio_ret < 0 && video_ret < 0) {
++        ALOGE("initStreams(%s) could not find any audio/video", mFilename);
+         ret = -1;
+         goto fail;
+     }
+@@ -1055,286 +1042,166 @@ fail:
+ 
+ void FFmpegExtractor::deInitStreams()
+ {
+-    packet_queue_destroy(&mVideoQ);
+-    packet_queue_destroy(&mAudioQ);
++    if (mAudioStreamIdx >= 0)
++        streamComponentClose(mAudioStreamIdx);
++    if (mVideoStreamIdx >= 0)
++        streamComponentClose(mVideoStreamIdx);
+ 
+     if (mFormatCtx) {
+         avformat_close_input(&mFormatCtx);
+     }
+ }
+ 
+-status_t FFmpegExtractor::startReaderThread() {
+-    ALOGV("Starting reader thread");
+-
+-    if (mReaderThreadStarted)
+-        return OK;
+-
+-    pthread_attr_t attr;
+-    pthread_attr_init(&attr);
+-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+-
+-    ALOGD("Reader thread starting");
+-
+-    pthread_create(&mReaderThread, &attr, ReaderWrapper, this);
+-    pthread_attr_destroy(&attr);
+-
+-    mReaderThreadStarted = true;
+-    mCondition.signal();
+-
+-    return OK;
+-}
+-
+-void FFmpegExtractor::stopReaderThread() {
+-    ALOGV("Stopping reader thread");
++int FFmpegExtractor::feedNextPacket() {
++    AVPacket pkt1, *pkt = &pkt1;
++    int ret;
+ 
+-    mLock.lock();
++    // Shortcut if EOF already reached
+ 
+-    if (!mReaderThreadStarted) {
+-        ALOGD("Reader thread have been stopped");
+-        mLock.unlock();
+-        return;
++    if (mEOF) {
++        return AVERROR_EOF;
+     }
+ 
+-    mAbortRequest = 1;
+-    mCondition.signal();
+-
+-    /* close each stream */
+-    if (mAudioStreamIdx >= 0)
+-        stream_component_close(mAudioStreamIdx);
+-    if (mVideoStreamIdx >= 0)
+-        stream_component_close(mVideoStreamIdx);
+-
+-    mLock.unlock();
+-    pthread_join(mReaderThread, NULL);
+-    mLock.lock();
++    // Read next frame
+ 
+-    if (mFormatCtx) {
+-        avformat_close_input(&mFormatCtx);
++    ret = av_read_frame(mFormatCtx, pkt);
++    if (ret < 0) {
++        if (ret == AVERROR_EOF) {
++            ALOGV("file reached EOF");
++        } else {
++            ALOGE("failed to read next frame: %s (%08x)", av_err2str(ret), ret);
++        }
++        mEOF = true;
++        return AVERROR_EOF;
+     }
++    mPktCounter++;
+ 
+-    mReaderThreadStarted = false;
+-    ALOGD("Reader thread stopped");
+-
+-    mLock.unlock();
+-}
+-
+-// static
+-void *FFmpegExtractor::ReaderWrapper(void *me) {
+-    ((FFmpegExtractor *)me)->readerEntry();
+-
+-    return NULL;
+-}
+-
+-void FFmpegExtractor::readerEntry() {
+-    int ret;
+-    AVPacket pkt1, *pkt = &pkt1;
+-    int eof = 0;
+-
+-    mLock.lock();
++#if DEBUG_PKT
++    ALOGV("next packet [%d] pts=%" PRId64 ", dts=%" PRId64 ", size=%d",
++          pkt->stream_index, pkt->pts, pkt->dts, pkt->size);
++#endif
+ 
+-    pid_t tid  = gettid();
+-    androidSetThreadPriority(tid,
+-            mVideoStreamIdx >= 0 ? ANDROID_PRIORITY_NORMAL : ANDROID_PRIORITY_AUDIO);
+-    prctl(PR_SET_NAME, (unsigned long)"FFmpegExtractor Thread", 0, 0, 0);
++    // Handle bitstream filter and deferred track creation
+ 
+-    ALOGV("FFmpegExtractor wait for signal");
+-    while (!mReaderThreadStarted && !mAbortRequest) {
+-        mCondition.wait(mLock);
+-    }
+-    ALOGV("FFmpegExtractor ready to run");
+-    mLock.unlock();
+-    if (mAbortRequest) {
+-        return;
+-    }
++    if (pkt->stream_index == mVideoStreamIdx) {
++         if (mDefersToCreateVideoTrack) {
++            AVCodecParameters *avpar = mFormatCtx->streams[mVideoStreamIdx]->codecpar;
++            int i = parser_split(avpar, pkt->data, pkt->size);
+ 
+-    mVideoEOSReceived = false;
+-    mAudioEOSReceived = false;
+-
+-    while (!mAbortRequest) {
++            if (i > 0 && i < FF_MAX_EXTRADATA_SIZE) {
++                if (avpar->extradata) {
++                    av_freep(&avpar->extradata);
++                }
++                avpar->extradata_size = i;
++                avpar->extradata = (uint8_t *)av_malloc(avpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
++                if (avpar->extradata) {
++                    // sps + pps(there may be sei in it)
++                    memcpy(avpar->extradata, pkt->data, avpar->extradata_size);
++                    memset(avpar->extradata + i, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++                } else {
++                    ALOGE("[video] failed to allocate new extradata");
++                    return AVERROR(ENOMEM);
++                }
++            } else {
++                av_packet_unref(pkt);
++                return AVERROR(EAGAIN);
++            }
+ 
+-        if (mPaused != mLastPaused) {
+-            mLastPaused = mPaused;
+-            if (mPaused)
+-                mReadPauseReturn = av_read_pause(mFormatCtx);
+-            else
+-                av_read_play(mFormatCtx);
+-        }
+-#if CONFIG_RTSP_DEMUXER || CONFIG_MMSH_PROTOCOL
+-        if (mPaused &&
+-                (!strcmp(mFormatCtx->iformat->name, "rtsp") ||
+-                 (mFormatCtx->pb && !strncmp(mFilename, "mmsh:", 5)))) {
+-            /* wait 10 ms to avoid trying to get another packet */
+-            /* XXX: horrible */
+-            usleep(10000);
+-            continue;
++            streamComponentOpen(mVideoStreamIdx);
++            if (!mDefersToCreateVideoTrack) {
++                ALOGI("[video] probe packet counter: %zu when track created", mPktCounter);
++            }
+         }
+-#endif
++    } else if (pkt->stream_index == mAudioStreamIdx) {
++        AVCodecParameters *avpar = mFormatCtx->streams[mAudioStreamIdx]->codecpar;
+ 
+-        if (mSeekIdx >= 0) {
+-            Mutex::Autolock _l(mLock);
+-            ALOGV("readerEntry, mSeekIdx: %d mSeekPos: %" PRId64 " (%" PRId64 "/%" PRId64 ")", mSeekIdx, mSeekPos, mSeekMin, mSeekMax);
+-            ret = avformat_seek_file(mFormatCtx, -1, mSeekMin, mSeekPos, mSeekMax, 0);
++        if (mAudioBsfc && pkt->data) {
++            ret = av_bsf_send_packet(mAudioBsfc, pkt);
+             if (ret < 0) {
+-                ALOGE("%s: error while seeking", mFormatCtx->filename);
+-                avformat_seek_file(mFormatCtx, -1, 0, 0, 0, 0);
++                ALOGE("[audio::%s] failed to send packet to filter, err = %d", mAudioBsfc->filter->name, ret);
++                av_packet_unref(pkt);
++                return ret;
+             }
+-            if (mAudioStreamIdx >= 0) {
+-                packet_queue_flush(&mAudioQ, true);
++            ret = av_bsf_receive_packet(mAudioBsfc, pkt);
++            if (ret < 0) {
++                ALOGE_IF(ret != AVERROR(EAGAIN), "[audio::%s] failed to received packet from filter, err=%d",
++                         mAudioBsfc->filter->name, ret);
++                av_packet_unref(pkt);
++                return ret;
+             }
+-            if (mVideoStreamIdx >= 0) {
+-                packet_queue_flush(&mVideoQ, true);
++            if (mDefersToCreateAudioTrack && avpar->extradata_size <= 0) {
++                int new_extradata_size = 0;
++                uint8_t* new_extradata = av_packet_get_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA, &new_extradata_size);
++
++                if (new_extradata_size > 0) {
++                    ALOGV("[audio::%s] extradata found, len=%d", mAudioBsfc->filter->name, new_extradata_size);
++                    avpar->extradata = (uint8_t*)av_mallocz(new_extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
++                    if (avpar->extradata) {
++                        memcpy(avpar->extradata, new_extradata, new_extradata_size);
++                        avpar->extradata_size = new_extradata_size;
++                    } else {
++                        ALOGE("[audio::%s] failed to allocate new extradata", mAudioBsfc->filter->name);
++                        return AVERROR(ENOMEM);
++                    }
++                }
+             }
+-            mSeekIdx = -1;
+-            eof = false;
+-            mCondition.signal();
+         }
+ 
+-        /* if the queue are full, no need to read more */
+-        if (   mAudioQ.size + mVideoQ.size > MAX_QUEUE_SIZE
+-            || (   (mAudioQ   .size  > MIN_AUDIOQ_SIZE || mAudioStreamIdx < 0)
+-                && (mVideoQ   .nb_packets > MIN_FRAMES || mVideoStreamIdx < 0))) {
+-#if DEBUG_READ_ENTRY
+-            ALOGV("readerEntry, full(wtf!!!), mVideoQ.size: %d, mVideoQ.nb_packets: %d, mAudioQ.size: %d, mAudioQ.nb_packets: %d",
+-                    mVideoQ.size, mVideoQ.nb_packets, mAudioQ.size, mAudioQ.nb_packets);
+-#endif
+-            // avoid deadlock, the audio and video data in the video is offset too large.
+-            if ((mAudioQ.size == 0) && mAudioQ.wait_for_data) {
+-                ALOGE("abort audio queue, since offset to video data too large");
+-                packet_queue_abort(&mAudioQ);
++        if (mDefersToCreateAudioTrack) {
++            if (avpar->extradata_size <= 0) {
++                av_packet_unref(pkt);
++                return AVERROR(EAGAIN);
+             }
+-            if ((mVideoQ.size == 0) && mVideoQ.wait_for_data) {
+-                ALOGE("abort video queue, since offset to audio data too large");
+-                packet_queue_abort(&mVideoQ);
++            streamComponentOpen(mAudioStreamIdx);
++            if (!mDefersToCreateAudioTrack) {
++                ALOGI("[audio] probe packet counter: %zu when track created", mPktCounter);
+             }
+-            /* wait 10 ms */
+-            mExtractorMutex.lock();
+-            mCondition.waitRelative(mExtractorMutex, milliseconds(10));
+-            mExtractorMutex.unlock();
+-            continue;
+         }
++    }
+ 
+-        if (eof) {
+-            if (mVideoStreamIdx >= 0) {
+-                packet_queue_put_nullpacket(&mVideoQ, mVideoStreamIdx);
+-            }
+-            if (mAudioStreamIdx >= 0) {
+-                packet_queue_put_nullpacket(&mAudioQ, mAudioStreamIdx);
+-            }
+-            /* wait 10 ms */
+-            mExtractorMutex.lock();
+-            mCondition.waitRelative(mExtractorMutex, milliseconds(10));
+-            eof = false;
+-            mExtractorMutex.unlock();
+-            continue;
+-        }
++    // Queue frame
+ 
+-        ret = av_read_frame(mFormatCtx, pkt);
++    if (pkt->stream_index == mVideoStreamIdx) {
++        packet_queue_put(&mVideoQ, pkt);
++        return mVideoStreamIdx;
++    } else if (pkt->stream_index == mAudioStreamIdx) {
++        packet_queue_put(&mAudioQ, pkt);
++        return mAudioStreamIdx;
++    } else {
++        av_packet_unref(pkt);
++        return AVERROR(EAGAIN);
++    }
++}
+ 
+-        mProbePkts++;
+-        if (ret < 0) {
+-            mEOF = true;
+-            eof = true;
+-            if (mFormatCtx->pb && mFormatCtx->pb->error &&
+-                    mFormatCtx->pb->error != ERROR_END_OF_STREAM) {
+-                ALOGE("mFormatCtx->pb->error: %d", mFormatCtx->pb->error);
+-                break;
+-            }
+-            /* wait 10 ms */
+-            mExtractorMutex.lock();
+-            mCondition.waitRelative(mExtractorMutex, milliseconds(10));
+-            mExtractorMutex.unlock();
+-            continue;
+-        }
++int FFmpegExtractor::getPacket(int trackIndex, AVPacket *pkt) {
++    TrackInfo& track = mTracks.editItemAt(trackIndex);
++    const char* type = av_get_media_type_string(track.mStream->codecpar->codec_type);
++    int err;
+ 
+-        if (pkt->stream_index == mVideoStreamIdx) {
+-             if (mDefersToCreateVideoTrack) {
+-                AVCodecParameters *avpar = mFormatCtx->streams[mVideoStreamIdx]->codecpar;
+-
+-                int i = parser_split(avpar, pkt->data, pkt->size);
+-                if (i > 0 && i < FF_MAX_EXTRADATA_SIZE) {
+-                    if (avpar->extradata)
+-                        av_freep(&avpar->extradata);
+-                    avpar->extradata_size= i;
+-                    avpar->extradata = (uint8_t *)av_malloc(avpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+-                    if (!avpar->extradata) {
+-                        //return AVERROR(ENOMEM);
+-                        ret = AVERROR(ENOMEM);
+-                        goto fail;
+-                    }
+-                    // sps + pps(there may be sei in it)
+-                    memcpy(avpar->extradata, pkt->data, avpar->extradata_size);
+-                    memset(avpar->extradata + i, 0, AV_INPUT_BUFFER_PADDING_SIZE);
+-                } else {
+-                    av_packet_unref(pkt);
+-                    continue;
+-                }
++    while (true) {
++        Mutex::Autolock _l(mLock);
+ 
+-                stream_component_open(mVideoStreamIdx);
+-                if (!mDefersToCreateVideoTrack)
+-                    ALOGI("probe packet counter: %zu when create video track ok", mProbePkts);
+-                if (mProbePkts == EXTRACTOR_MAX_PROBE_PACKETS)
+-                    ALOGI("probe packet counter to max: %zu, create video track: %d",
+-                        mProbePkts, !mDefersToCreateVideoTrack);
++        err = packet_queue_get(track.mQueue, pkt, 0);
++        if (err > 0) {
++            if (track.mSeek && (pkt->flags & AV_PKT_FLAG_KEY) != 0) {
++                ALOGV("[%s] (seek) key frame found @ ts=%" PRId64,
++                      type, pkt->pts != AV_NOPTS_VALUE ? av_rescale_q(pkt->pts, track.mStream->time_base, AV_TIME_BASE_Q) : -1);
++                track.mSeek = false;
+             }
+-        } else if (pkt->stream_index == mAudioStreamIdx) {
+-            int ret;
+-            AVCodecParameters *avpar = mFormatCtx->streams[mAudioStreamIdx]->codecpar;
+-            if (mAudioBsfc && pkt && pkt->data) {
+-                ret = av_bsf_send_packet(mAudioBsfc, pkt);
+-                if (ret < 0) {
+-                    ALOGE("[%s] failed to send packet to filter, err = %d", mAudioBsfc->filter->name, ret);
+-                    av_packet_unref(pkt);
+-                    continue;
+-                }
+-                ret = av_bsf_receive_packet(mAudioBsfc, pkt);
+-                if (ret < 0) {
+-                    ALOGE_IF(ret != AVERROR(EAGAIN), "[%s] failed to received packet from filter, err=%d",
+-                             mAudioBsfc->filter->name, ret);
+-                    continue;
+-                }
+-                if (mDefersToCreateAudioTrack && avpar->extradata_size <= 0) {
+-                    int new_extradata_size = 0;
+-                    uint8_t* new_extradata = av_packet_get_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA, &new_extradata_size);
+-                    if (new_extradata_size > 0) {
+-                        ALOGV("[%s] extradata found, len=%d", mAudioBsfc->filter->name, new_extradata_size);
+-                        avpar->extradata = (uint8_t*)av_mallocz(new_extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+-                        if (avpar->extradata) {
+-                            memcpy(avpar->extradata, new_extradata, new_extradata_size);
+-                            avpar->extradata_size = new_extradata_size;
+-                        } else {
+-                            ALOGE("[%s] failed to allocate new extradata", mAudioBsfc->filter->name);
+-                        }
+-                    }
+-                }
++            if (! track.mSeek) {
++                return 0;
++            } else {
++                ALOGV("[%s] (seek) drop non key frame", type);
+             }
+-            if (mDefersToCreateAudioTrack) {
+-                if (avpar->extradata_size <= 0) {
+-                    ALOGD("still no extradata, mProbePkts=%ld", mProbePkts);
+-                    av_packet_unref(pkt);
+-                    continue;
+-                }
+-                stream_component_open(mAudioStreamIdx);
+-                if (!mDefersToCreateAudioTrack)
+-                    ALOGI("probe packet counter: %zu when create audio track ok", mProbePkts);
+-                if (mProbePkts == EXTRACTOR_MAX_PROBE_PACKETS)
+-                    ALOGI("probe packet counter to max: %zu, create audio track: %d",
+-                        mProbePkts, !mDefersToCreateAudioTrack);
++        } else if (err < 0) {
++            return AVERROR_UNKNOWN;
++        } else if (err == 0) {
++            err = feedNextPacket();
++            if (err < 0 && err != AVERROR(EAGAIN)) {
++                return err;
+             }
+         }
+-
+-        if (pkt->stream_index == mAudioStreamIdx) {
+-            packet_queue_put(&mAudioQ, pkt);
+-        } else if (pkt->stream_index == mVideoStreamIdx) {
+-            packet_queue_put(&mVideoQ, pkt);
+-        } else {
+-            av_packet_unref(pkt);
+-        }
+     }
+-
+-    ret = 0;
+-
+-fail:
+-    ALOGV("FFmpegExtractor exit thread(readerEntry)");
+ }
+ 
+ ////////////////////////////////////////////////////////////////////////////////
+@@ -1347,84 +1214,81 @@ FFmpegSource::FFmpegSource(
+       mIsHEVC(false),
+       mNal2AnnexB(false),
+       mStream(mExtractor->mTracks.itemAt(index).mStream),
+-      mQueue(mExtractor->mTracks.itemAt(index).mQueue),
+       mLastPTS(AV_NOPTS_VALUE),
+       mTargetTime(AV_NOPTS_VALUE) {
+     AMediaFormat *meta = mExtractor->mTracks.itemAt(index).mMeta;
++    AVCodecParameters *avpar = mStream->codecpar;
+ 
+-    {
+-        AVCodecParameters *avpar = mStream->codecpar;
++    mMediaType = mStream->codecpar->codec_type;
++    mFirstKeyPktTimestamp = AV_NOPTS_VALUE;
+ 
+-        /* Parse codec specific data */
+-        if (avpar->codec_id == AV_CODEC_ID_H264
+-                && avpar->extradata_size > 0
+-                && avpar->extradata[0] == 1) {
+-            mIsAVC = true;
++    ALOGV("[%s] FFmpegSource::FFmpegSource", av_get_media_type_string(mMediaType));
+ 
+-            void *data;
+-            size_t size;
+-            CHECK(AMediaFormat_getBuffer(meta, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
++    /* Parse codec specific data */
++    if (avpar->codec_id == AV_CODEC_ID_H264
++            && avpar->extradata_size > 0
++            && avpar->extradata[0] == 1) {
++        mIsAVC = true;
+ 
+-            const uint8_t *ptr = (const uint8_t *)data;
++        void *data;
++        size_t size;
++        CHECK(AMediaFormat_getBuffer(meta, AMEDIAFORMAT_KEY_CSD_AVC, &data, &size));
+ 
+-            CHECK(size >= 7);
+-            CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
++        const uint8_t *ptr = (const uint8_t *)data;
+ 
+-            // The number of bytes used to encode the length of a NAL unit.
+-            mNALLengthSize = 1 + (ptr[4] & 3);
++        CHECK(size >= 7);
++        CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+ 
+-            ALOGV("the stream is AVC, the length of a NAL unit: %zu", mNALLengthSize);
++        // The number of bytes used to encode the length of a NAL unit.
++        mNALLengthSize = 1 + (ptr[4] & 3);
+ 
+-            mNal2AnnexB = true;
+-        } else if (avpar->codec_id == AV_CODEC_ID_HEVC
+-                && avpar->extradata_size > 3
+-                && (avpar->extradata[0] || avpar->extradata[1] ||
+-                    avpar->extradata[2] > 1)) {
+-            /* It seems the extradata is encoded as hvcC format.
+-             * Temporarily, we support configurationVersion==0 until 14496-15 3rd
+-             * is finalized. When finalized, configurationVersion will be 1 and we
+-             * can recognize hvcC by checking if avpar->extradata[0]==1 or not. */
+-            mIsHEVC = true;
++        ALOGV("[video] the stream is AVC, the length of a NAL unit: %zu", mNALLengthSize);
+ 
+-            void *data;
+-            size_t size;
+-            CHECK(AMediaFormat_getBuffer(meta, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
++        mNal2AnnexB = true;
++    } else if (avpar->codec_id == AV_CODEC_ID_HEVC
++            && avpar->extradata_size > 3
++            && (avpar->extradata[0] || avpar->extradata[1] ||
++                avpar->extradata[2] > 1)) {
++        /* It seems the extradata is encoded as hvcC format.
++         * Temporarily, we support configurationVersion==0 until 14496-15 3rd
++         * is finalized. When finalized, configurationVersion will be 1 and we
++         * can recognize hvcC by checking if avpar->extradata[0]==1 or not. */
++        mIsHEVC = true;
+ 
+-            const uint8_t *ptr = (const uint8_t *)data;
++        void *data;
++        size_t size;
++        CHECK(AMediaFormat_getBuffer(meta, AMEDIAFORMAT_KEY_CSD_HEVC, &data, &size));
+ 
+-            CHECK(size >= 7);
+-            //CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
++        const uint8_t *ptr = (const uint8_t *)data;
+ 
+-            // The number of bytes used to encode the length of a NAL unit.
+-            mNALLengthSize = 1 + (ptr[21] & 3);
++        CHECK(size >= 7);
++        //CHECK_EQ((unsigned)ptr[0], 1u);  // configurationVersion == 1
+ 
+-            ALOGD("the stream is HEVC, the length of a NAL unit: %zu", mNALLengthSize);
++        // The number of bytes used to encode the length of a NAL unit.
++        mNALLengthSize = 1 + (ptr[21] & 3);
+ 
+-            mNal2AnnexB = true;
+-        }
++        ALOGD("[video] the stream is HEVC, the length of a NAL unit: %zu", mNALLengthSize);
+ 
++        mNal2AnnexB = true;
+     }
+-
+-    mMediaType = mStream->codecpar->codec_type;
+-    mFirstKeyPktTimestamp = AV_NOPTS_VALUE;
+ }
+ 
+ FFmpegSource::~FFmpegSource() {
+-    ALOGV("FFmpegSource::~FFmpegSource %s",
++    ALOGV("[%s] FFmpegSource::~FFmpegSource",
+             av_get_media_type_string(mMediaType));
+     mExtractor = NULL;
+ }
+ 
+ media_status_t FFmpegSource::start() {
+-    ALOGV("FFmpegSource::start %s",
+-            av_get_media_type_string(mMediaType));
++    ALOGV("[%s] FFmpegSource::start",
++          av_get_media_type_string(mMediaType));
+     mBufferGroup->init(1, 1024, 64);
+     return AMEDIA_OK;
+ }
+ 
+ media_status_t FFmpegSource::stop() {
+-    ALOGV("FFmpegSource::stop %s",
+-            av_get_media_type_string(mMediaType));
++    ALOGV("[%s] FFmpegSource::stop",
++          av_get_media_type_string(mMediaType));
+     return AMEDIA_OK;
+ }
+ 
+@@ -1438,8 +1302,6 @@ media_status_t FFmpegSource::read(
+     *buffer = NULL;
+ 
+     AVPacket pkt;
+-    bool seeking = false;
+-    bool waitKeyPkt = false;
+     ReadOptions::SeekMode mode;
+     int64_t pktTS = AV_NOPTS_VALUE;
+     int64_t seekTimeUs = AV_NOPTS_VALUE;
+@@ -1447,69 +1309,40 @@ media_status_t FFmpegSource::read(
+     int key = 0;
+     media_status_t status = AMEDIA_OK;
+     int max_negative_time_frame = 100;
+-    bool pktIsFlush = false;
++    int err;
+ 
+-    int64_t startTimeUs = mStream->start_time == AV_NOPTS_VALUE ? 0 :
+-        av_rescale_q(mStream->start_time, mStream->time_base, AV_TIME_BASE_Q);
++    // FIXME: should we really use mStream->start_time?
++    // int64_t startTimeUs = mStream->start_time == AV_NOPTS_VALUE ? 0 :
++    //     av_rescale_q(mStream->start_time, mStream->time_base, AV_TIME_BASE_Q);
++    int64_t startTimeUs = 0;
+ 
+     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
+         int64_t seekPTS = seekTimeUs;
+-        ALOGV("~~~%s seekTimeUs: %" PRId64 ", seekPTS: %" PRId64 ", mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, seekPTS, mode);
++        ALOGV("[%s] (seek) seekTimeUs: %" PRId64 ", seekPTS: %" PRId64 ", mode: %d",
++              av_get_media_type_string(mMediaType), seekTimeUs, seekPTS, mode);
+         /* add the stream start time */
+         if (mStream->start_time != AV_NOPTS_VALUE) {
+             seekPTS += startTimeUs;
+         }
+-        ALOGV("~~~%s seekTimeUs[+startTime]: %" PRId64 ", mode: %d start_time=%" PRId64, av_get_media_type_string(mMediaType), seekPTS, mode, startTimeUs);
+-        seeking = (mExtractor->stream_seek(seekPTS, mMediaType, mode) == SEEK);
++        ALOGV("[%s] (seek) seekTimeUs[+startTime]: %" PRId64 ", mode: %d start_time=%" PRId64,
++              av_get_media_type_string(mMediaType), seekPTS, mode, startTimeUs);
++        mExtractor->streamSeek(mTrackIndex, seekPTS, mode);
+     }
+ 
+ retry:
+-    if (packet_queue_get(mQueue, &pkt, 1) < 0) {
+-        ALOGD("read %s abort reqeust", av_get_media_type_string(mMediaType));
+-        mExtractor->reachedEOS(mMediaType);
+-        return AMEDIA_ERROR_END_OF_STREAM;
+-    }
+-
+-    pktIsFlush = packet_queue_is_flushpacket(mQueue, &pkt);
+-
+-    if (seeking) {
+-        if (! pktIsFlush) {
+-            av_packet_unref(&pkt);
+-            goto retry;
++    err = mExtractor->getPacket(mTrackIndex, &pkt);
++    if (err < 0) {
++        if (err == AVERROR_EOF) {
++            ALOGV("[%s] read EOS", av_get_media_type_string(mMediaType));
+         } else {
+-            seeking = false;
+-#if WAIT_KEY_PACKET_AFTER_SEEK
+-            waitKeyPkt = true;
+-#endif
++            ALOGE("[%s] read error: %s (%08x)", av_get_media_type_string(mMediaType), av_err2str(err), err);
+         }
+-    }
+-
+-    if (pktIsFlush) {
+-        ALOGV("read %s flush pkt", av_get_media_type_string(mMediaType));
+-        av_packet_unref(&pkt);
+-        mFirstKeyPktTimestamp = AV_NOPTS_VALUE;
+-        goto retry;
+-    } else if (pkt.data == NULL && pkt.size == 0) {
+-        ALOGD("read %s eos pkt", av_get_media_type_string(mMediaType));
+-        av_packet_unref(&pkt);
+-        mExtractor->reachedEOS(mMediaType);
+         return AMEDIA_ERROR_END_OF_STREAM;
+     }
+ 
+     key = pkt.flags & AV_PKT_FLAG_KEY ? 1 : 0;
+     pktTS = pkt.pts == AV_NOPTS_VALUE ? pkt.dts : pkt.pts;
+ 
+-    if (waitKeyPkt) {
+-        if (!key) {
+-            ALOGV("drop the non-key packet");
+-            av_packet_unref(&pkt);
+-            goto retry;
+-        } else {
+-            ALOGV("~~~~~~ got the key packet");
+-            waitKeyPkt = false;
+-        }
+-    }
+-
+     if (pktTS != AV_NOPTS_VALUE && mFirstKeyPktTimestamp == AV_NOPTS_VALUE) {
+         // update the first key timestamp
+         mFirstKeyPktTimestamp = pktTS;
+@@ -1524,7 +1357,8 @@ retry:
+     if ((mIsAVC || mIsHEVC) && mNal2AnnexB) {
+         /* This only works for NAL sizes 3-4 */
+         if ((mNALLengthSize != 3) && (mNALLengthSize != 4)) {
+-            ALOGE("cannot use convertNal2AnnexB, nal size: %zu", mNALLengthSize);
++            ALOGE("[%s] cannot use convertNal2AnnexB, nal size: %zu",
++                  av_get_media_type_string(mMediaType), mNALLengthSize);
+             mediaBuffer->release();
+             mediaBuffer = NULL;
+             av_packet_unref(&pkt);
+@@ -1535,7 +1369,8 @@ retry:
+         /* Convert H.264 NAL format to annex b */
+         status = convertNal2AnnexB(dst, pkt.size, pkt.data, pkt.size, mNALLengthSize);
+         if (status != AMEDIA_OK) {
+-            ALOGE("convertNal2AnnexB failed");
++            ALOGE("[%s] convertNal2AnnexB failed",
++                  av_get_media_type_string(mMediaType));
+             mediaBuffer->release();
+             mediaBuffer = NULL;
+             av_packet_unref(&pkt);
+@@ -1554,59 +1389,63 @@ retry:
+     // in OMXCodec.cpp CHECK(lastBufferTimeUs >= 0).
+     // And we should not get negative timestamp
+     if (timeUs < 0) {
+-        ALOGE("negative timestamp encounter: time: %" PRId64
++        ALOGE("[%s] negative timestamp encounter: time: %" PRId64
+                " startTimeUs: %" PRId64
+                " packet dts: %" PRId64
+                " packet pts: %" PRId64
+-               , timeUs, startTimeUs, pkt.dts, pkt.pts);
++               , av_get_media_type_string(mMediaType), timeUs, startTimeUs, pkt.dts, pkt.pts);
+         mediaBuffer->release();
+         mediaBuffer = NULL;
+         av_packet_unref(&pkt);
+         if (max_negative_time_frame-- > 0) {
+             goto retry;
+         } else {
+-            ALOGE("too many negative timestamp packets, abort decoding");
++            ALOGE("[%s] too many negative timestamp packets, abort decoding",
++                  av_get_media_type_string(mMediaType));
+             return AMEDIA_ERROR_MALFORMED;
+         }
+     }
+ 
+-    // predict the next PTS to use for exact-frame seek below
+-    int64_t nextPTS = AV_NOPTS_VALUE;
+-    if (mLastPTS != AV_NOPTS_VALUE && timeUs > mLastPTS) {
+-        nextPTS = timeUs + (timeUs - mLastPTS);
+-        mLastPTS = timeUs;
+-    } else if (mLastPTS == AV_NOPTS_VALUE) {
+-        mLastPTS = timeUs;
+-    }
++    // FIXME: figure out what this is supposed to do...
++    // // predict the next PTS to use for exact-frame seek below
++    // int64_t nextPTS = AV_NOPTS_VALUE;
++    // if (mLastPTS != AV_NOPTS_VALUE && timeUs > mLastPTS) {
++    //     nextPTS = timeUs + (timeUs - mLastPTS);
++    //     mLastPTS = timeUs;
++    // } else if (mLastPTS == AV_NOPTS_VALUE) {
++    //     mLastPTS = timeUs;
++    // }
+ 
+ #if DEBUG_PKT
+     if (pktTS != AV_NOPTS_VALUE)
+-        ALOGV("read %s pkt, size:%d, key:%d, pktPTS: %lld, pts:%lld, dts:%lld, timeUs[-startTime]:%lld us (%.2f secs) start_time=%lld",
++        ALOGV("[%s] read pkt, size:%d, key:%d, pktPTS: %lld, pts:%lld, dts:%lld, timeUs[-startTime]:%lld us (%.2f secs) start_time=%lld",
+             av_get_media_type_string(mMediaType), pkt.size, key, pktTS, pkt.pts, pkt.dts, timeUs, timeUs/1E6, startTimeUs);
+     else
+-        ALOGV("read %s pkt, size:%d, key:%d, pts:N/A, dts:N/A, timeUs[-startTime]:N/A",
++        ALOGV("[%s] read pkt, size:%d, key:%d, pts:N/A, dts:N/A, timeUs[-startTime]:N/A",
+             av_get_media_type_string(mMediaType), pkt.size, key);
+ #endif
+ 
+     AMediaFormat_setInt64(mediaBuffer->meta_data(), AMEDIAFORMAT_KEY_TIME_US, timeUs);
+     AMediaFormat_setInt32(mediaBuffer->meta_data(), AMEDIAFORMAT_KEY_IS_SYNC_FRAME, key);
+ 
+-    // deal with seek-to-exact-frame, we might be off a bit and Stagefright will assert on us
+-    if (seekTimeUs != AV_NOPTS_VALUE && timeUs < seekTimeUs &&
+-            mode == MediaSource::ReadOptions::SEEK_CLOSEST) {
+-        mTargetTime = seekTimeUs;
+-        AMediaFormat_setInt64(mediaBuffer->meta_data(), AMEDIAFORMAT_KEY_TARGET_TIME, seekTimeUs);
+-    }
+-
+-    if (mTargetTime != AV_NOPTS_VALUE) {
+-        if (timeUs == mTargetTime) {
+-            mTargetTime = AV_NOPTS_VALUE;
+-        } else if (nextPTS != AV_NOPTS_VALUE && nextPTS > mTargetTime) {
+-            ALOGV("adjust target frame time to %" PRId64, timeUs);
+-            AMediaFormat_setInt64(mediaBuffer->meta_data(), AMEDIAFORMAT_KEY_TIME_US, mTargetTime);
+-            mTargetTime = AV_NOPTS_VALUE;
+-        }
+-    }
++    // FIXME: also figure out what this is supposed to do...
++    // // deal with seek-to-exact-frame, we might be off a bit and Stagefright will assert on us
++    // if (seekTimeUs != AV_NOPTS_VALUE && timeUs < seekTimeUs &&
++    //         mode == MediaSource::ReadOptions::SEEK_CLOSEST) {
++    //     mTargetTime = seekTimeUs;
++    //     AMediaFormat_setInt64(mediaBuffer->meta_data(), AMEDIAFORMAT_KEY_TARGET_TIME, seekTimeUs);
++    // }
++
++    // if (mTargetTime != AV_NOPTS_VALUE) {
++    //     if (timeUs == mTargetTime) {
++    //         mTargetTime = AV_NOPTS_VALUE;
++    //     } else if (nextPTS != AV_NOPTS_VALUE && nextPTS > mTargetTime) {
++    //         ALOGV("[%s] adjust target frame time to %" PRId64,
++    //               av_get_media_type_string(mMediaType), timeUs);
++    //         AMediaFormat_setInt64(mediaBuffer->meta_data(), AMEDIAFORMAT_KEY_TIME_US, mTargetTime);
++    //         mTargetTime = AV_NOPTS_VALUE;
++    //     }
++    // }
+ 
+     *buffer = mediaBuffer;
+ 
+@@ -1732,14 +1571,14 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
+         break;
+     }
+ 
+-    ALOGD("%ssupported codec (%s) by official Stagefright",
++    ALOGD("%ssupported codec(%s) by official Stagefright",
+             (supported ? "" : "un"),
+             avcodec_get_name(codec_id));
+ 
+     return supported;
+ }
+ 
+-static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence, bool isStreaming)
++static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence)
+ {
+     AVDictionary *tags = NULL;
+     AVDictionaryEntry *tag = NULL;
+@@ -1756,7 +1595,7 @@ static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence, bool i
+             && codec_id != AV_CODEC_ID_H263P
+             && codec_id != AV_CODEC_ID_H263I) {
+         //the MEDIA_MIMETYPE_CONTAINER_MPEG4 of confidence is 0.4f
+-        ALOGI("[mp4]video codec(%s), confidence should be larger than MPEG4Extractor",
++        ALOGI("[mp4] video codec(%s), confidence should be larger than MPEG4Extractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.41f;
+     }
+@@ -1767,7 +1606,7 @@ static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence, bool i
+             && codec_id != AV_CODEC_ID_AAC
+             && codec_id != AV_CODEC_ID_AMR_NB
+             && codec_id != AV_CODEC_ID_AMR_WB) {
+-        ALOGI("[mp4]audio codec(%s), confidence should be larger than MPEG4Extractor",
++        ALOGI("[mp4] audio codec(%s), confidence should be larger than MPEG4Extractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.41f;
+     }
+@@ -1778,7 +1617,7 @@ static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence, bool i
+     //e.g. "ffprobe -show_format 2012.mov"
+     tag = av_dict_get(tags, "major_brand", NULL, 0);
+     if (tag) {
+-        ALOGV("major_brand tag is:%s", tag->value);
++        ALOGV("major_brand tag: %s", tag->value);
+ 
+         //when MEDIA_MIMETYPE_CONTAINER_MPEG4
+         //WTF, MPEG4Extractor.cpp can not extractor mov format
+@@ -1788,16 +1627,11 @@ static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence, bool i
+         //  FOURCC('q', 't', ' ', ' '),  // Apple's QuickTime
+         //So......
+         if (!strcmp(tag->value, "qt  ")) {
+-            ALOGI("[mp4]format is mov, confidence should be larger than mpeg4");
++            ALOGI("[mp4] format is mov, confidence should be larger than mpeg4");
+             *confidence = 0.41f;
+             is_mov = true;
+         }
+     }
+-    if (isStreaming && !is_mov) {
+-        ALOGI("support container: video/mp4, but it is caching data source, "
+-                "Don't use ffmpegextractor");
+-        *confidence = 0; // MP4 and streaming, use AOSP
+-    }
+ }
+ 
+ static void adjustMPEG2PSConfidence(AVFormatContext *ic, float *confidence)
+@@ -1811,7 +1645,7 @@ static void adjustMPEG2PSConfidence(AVFormatContext *ic, float *confidence)
+             && codec_id != AV_CODEC_ID_MPEG1VIDEO
+             && codec_id != AV_CODEC_ID_MPEG2VIDEO) {
+         //the MEDIA_MIMETYPE_CONTAINER_MPEG2TS of confidence is 0.25f
+-        ALOGI("[mpeg2ps]video codec(%s), confidence should be larger than MPEG2PSExtractor",
++        ALOGI("[mpeg2ps] video codec(%s), confidence should be larger than MPEG2PSExtractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.26f;
+     }
+@@ -1824,7 +1658,7 @@ static void adjustMPEG2PSConfidence(AVFormatContext *ic, float *confidence)
+             && codec_id != AV_CODEC_ID_MP1
+             && codec_id != AV_CODEC_ID_MP2
+             && codec_id != AV_CODEC_ID_MP3) {
+-        ALOGI("[mpeg2ps]audio codec(%s), confidence should be larger than MPEG2PSExtractor",
++        ALOGI("[mpeg2ps] audio codec(%s), confidence should be larger than MPEG2PSExtractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.26f;
+     }
+@@ -1841,7 +1675,7 @@ static void adjustMPEG2TSConfidence(AVFormatContext *ic, float *confidence)
+             && codec_id != AV_CODEC_ID_MPEG1VIDEO
+             && codec_id != AV_CODEC_ID_MPEG2VIDEO) {
+         //the MEDIA_MIMETYPE_CONTAINER_MPEG2TS of confidence is 0.1f
+-        ALOGI("[mpeg2ts]video codec(%s), confidence should be larger than MPEG2TSExtractor",
++        ALOGI("[mpeg2ts] video codec(%s), confidence should be larger than MPEG2TSExtractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.11f;
+     }
+@@ -1854,7 +1688,7 @@ static void adjustMPEG2TSConfidence(AVFormatContext *ic, float *confidence)
+             && codec_id != AV_CODEC_ID_MP1
+             && codec_id != AV_CODEC_ID_MP2
+             && codec_id != AV_CODEC_ID_MP3) {
+-        ALOGI("[mpeg2ts]audio codec(%s), confidence should be larger than MPEG2TSExtractor",
++        ALOGI("[mpeg2ts] audio codec(%s), confidence should be larger than MPEG2TSExtractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.11f;
+     }
+@@ -1872,7 +1706,7 @@ static void adjustMKVConfidence(AVFormatContext *ic, float *confidence)
+             && codec_id != AV_CODEC_ID_VP8
+             && codec_id != AV_CODEC_ID_VP9) {
+         //the MEDIA_MIMETYPE_CONTAINER_MATROSKA of confidence is 0.6f
+-        ALOGI("[mkv]video codec(%s), confidence should be larger than MatroskaExtractor",
++        ALOGI("[mkv] video codec(%s), confidence should be larger than MatroskaExtractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.61f;
+     }
+@@ -1883,7 +1717,7 @@ static void adjustMKVConfidence(AVFormatContext *ic, float *confidence)
+             && codec_id != AV_CODEC_ID_MP3
+             && codec_id != AV_CODEC_ID_OPUS
+             && codec_id != AV_CODEC_ID_VORBIS) {
+-        ALOGI("[mkv]audio codec(%s), confidence should be larger than MatroskaExtractor",
++        ALOGI("[mkv] audio codec(%s), confidence should be larger than MatroskaExtractor",
+                 avcodec_get_name(codec_id));
+         *confidence = 0.61f;
+     }
+@@ -1915,11 +1749,11 @@ static void adjustCodecConfidence(AVFormatContext *ic, float *confidence)
+ 
+ //TODO need more checks
+ static void adjustConfidenceIfNeeded(const char *mime,
+-        AVFormatContext *ic, float *confidence, bool isStreaming)
++        AVFormatContext *ic, float *confidence)
+ {
+     //1. check mime
+     if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
+-        adjustMPEG4Confidence(ic, confidence, isStreaming);
++        adjustMPEG4Confidence(ic, confidence);
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2TS)) {
+         adjustMPEG2TSConfidence(ic, confidence);
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2PS)) {
+@@ -2055,7 +1889,7 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
+     err = avformat_open_input(&ic, url, NULL, NULL);
+ 
+     if (err < 0) {
+-        ALOGE("%s: avformat_open_input failed, err:%s", url, av_err2str(err));
++        ALOGE("avformat_open_input(%s) failed: %s (%08x)", url, av_err2str(err), err);
+         goto fail;
+     }
+ 
+@@ -2085,7 +1919,7 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
+         nb_streams = ic->nb_streams;
+         err = avformat_find_stream_info(ic, opts);
+         if (err < 0) {
+-            ALOGE("%s: could not find stream info, err:%s", url, av_err2str(err));
++            ALOGE("avformat_find_stream_info(%s) failed: %s (%08x)", url, av_err2str(err), err);
+             goto fail;
+         }
+ 
+@@ -2099,13 +1933,13 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
+         av_dump_format(ic, 0, url, 0);
+     }
+ 
+-    ALOGV("url: %s, format_name: %s, format_long_name: %s",
++    ALOGV("sniff(%s): format_name: %s, format_long_name: %s",
+             url, ic->iformat->name, ic->iformat->long_name);
+ 
+     container = findMatchingContainer(ic->iformat->name);
+     if (container) {
+         adjustContainerIfNeeded(&container, ic);
+-        adjustConfidenceIfNeeded(container, ic, confidence, isStreaming);
++        adjustConfidenceIfNeeded(container, ic, confidence);
+         if (*confidence == 0)
+             container = NULL;
+     }
+@@ -2152,7 +1986,7 @@ static const char *LegacySniffFFMPEG(CDataSource *source,
+     if (source->flags(source->handle) & DataSourceBase::kIsCachingDataSource)
+        return NULL;
+ 
+-    ALOGV("source url:%s", uri);
++    ALOGV("source url: %s", uri);
+ 
+     // pass the addr of smart pointer("source") + file name
+     snprintf(url, sizeof(url), "android-source:%p|file:%s", source, uri);
+diff --git a/extractor/FFmpegExtractor.h b/extractor/FFmpegExtractor.h
+index b296058..f0ab046 100644
+--- a/extractor/FFmpegExtractor.h
++++ b/extractor/FFmpegExtractor.h
+@@ -57,17 +57,15 @@ private:
+         AMediaFormat *mMeta;
+         AVStream *mStream;
+         PacketQueue *mQueue;
++        bool mSeek;
+     };
+ 
+     Vector<TrackInfo> mTracks;
+ 
+     mutable Mutex mLock;
+-    mutable Mutex mExtractorMutex;
+-    Condition mCondition;
+ 
+     DataSourceHelper *mDataSource;
+     AMediaFormat *mMeta;
+-    status_t mInitCheck;
+ 
+     char mFilename[PATH_MAX];
+     int mGenPTS;
+@@ -75,27 +73,13 @@ private:
+     int mAudioDisable;
+     int mShowStatus;
+     int mSeekByBytes;
+-    int mAutoExit;
+-    int64_t mStartTime;
+     int64_t mDuration;
+-    int mLoop;
+     bool mEOF;
+-    size_t mProbePkts;
+-
++    size_t mPktCounter;
+     int mAbortRequest;
+-    int mPaused;
+-    int mLastPaused;
+-    int mSeekIdx;
+-    MediaTrackHelper::ReadOptions::SeekMode mSeekMode;
+-    int64_t mSeekPos;
+-    int64_t mSeekMin;
+-    int64_t mSeekMax;
+-
+-    int mReadPauseReturn;
++
+     PacketQueue mAudioQ;
+     PacketQueue mVideoQ;
+-    bool mVideoEOSReceived;
+-    bool mAudioEOSReceived;
+ 
+     AVFormatContext *mFormatCtx;
+     int mVideoStreamIdx;
+@@ -106,32 +90,25 @@ private:
+     bool mDefersToCreateAudioTrack;
+     AVBSFContext *mVideoBsfc;
+     AVBSFContext *mAudioBsfc;
++    bool mParsedMetadata;
++
++    static int decodeInterruptCb(void *ctx);
+ 
+-    static int decode_interrupt_cb(void *ctx);
+     int initStreams();
+     void deInitStreams();
+     void fetchStuffsFromSniffedMeta(const sp<AMessage> &meta);
+     void setFFmpegDefaultOpts();
+-    void printTime(int64_t time);
+-    bool is_codec_supported(enum AVCodecID codec_id);
++    int feedNextPacket();
++    int getPacket(int trackIndex, AVPacket *pkt);
++    bool isCodecSupported(enum AVCodecID codec_id);
+     media_status_t setVideoFormat(AVStream *stream, AMediaFormat *meta);
+     media_status_t setAudioFormat(AVStream *stream, AMediaFormat *meta);
+     void setDurationMetaData(AVStream *stream, AMediaFormat *meta);
+-    int stream_component_open(int stream_index);
+-    void stream_component_close(int stream_index);
+-    void reachedEOS(enum AVMediaType media_type);
+-    int stream_seek(int64_t pos, enum AVMediaType media_type,
+-            MediaTrackHelper::ReadOptions::SeekMode mode);
+-    int check_extradata(AVCodecParameters *avpar);
+-
+-    bool mReaderThreadStarted;
+-    pthread_t mReaderThread;
+-    status_t startReaderThread();
+-    void stopReaderThread();
+-    static void *ReaderWrapper(void *me);
+-    void readerEntry();
+-
+-    bool mParsedMetadata;
++    int streamComponentOpen(int streamIndex);
++    void streamComponentClose(int streamIndex);
++    int streamSeek(int trackIndex, int64_t pos,
++                    MediaTrackHelper::ReadOptions::SeekMode mode);
++    int checkExtradata(AVCodecParameters *avpar);
+ 
+     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
+ };
+diff --git a/utils/ffmpeg_source.cpp b/utils/ffmpeg_source.cpp
+index ccd636a..379daab 100644
+--- a/utils/ffmpeg_source.cpp
++++ b/utils/ffmpeg_source.cpp
+@@ -21,6 +21,7 @@
+ #include "ffmpeg_source.h"
+ 
+ #include <media/MediaExtractorPluginApi.h>
++#include <media/stagefright/MediaErrors.h>
+ 
+ extern "C" {
+ 
+@@ -55,9 +56,11 @@ int FFSource::read(unsigned char *buf, size_t size)
+     ssize_t n = 0;
+ 
+     n = mSource->readAt(mSource->handle, mOffset, buf, size);
+-    if (n == UNKNOWN_ERROR) {
+-        ALOGE("FFSource readAt failed");
+-        return AVERROR(errno);
++    if (n == ERROR_END_OF_STREAM) {
++        return AVERROR_EOF;
++    } else if (n < 0) {
++        ALOGE("FFSource readAt failed (%zd)", n);
++        return n == UNKNOWN_ERROR ? AVERROR(errno) : n;
+     }
+     if (n > 0) {
+         mOffset += n;
+diff --git a/utils/ffmpeg_utils.cpp b/utils/ffmpeg_utils.cpp
+index 2ce12be..e7ca34b 100644
+--- a/utils/ffmpeg_utils.cpp
++++ b/utils/ffmpeg_utils.cpp
+@@ -343,7 +343,6 @@ void packet_queue_destroy(PacketQueue *q)
+ {
+     packet_queue_abort(q);
+     packet_queue_flush(q);
+-    av_packet_unref(&q->flush_pkt);
+ }
+ 
+ void packet_queue_abort(PacketQueue *q)
+@@ -378,12 +377,6 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
+     return 0;
+ }
+ 
+-static int packet_queue_put_flushpacket_private(PacketQueue *q) {
+-    AVPacket pkt1, *pkt = &pkt1;
+-    av_packet_ref(pkt, &q->flush_pkt);
+-    return packet_queue_put_private(q, pkt);
+-}
+-
+ int packet_queue_put(PacketQueue *q, AVPacket *pkt)
+ {
+     int ret;
+@@ -401,7 +394,7 @@ int packet_queue_is_wait_for_data(PacketQueue *q)
+     return q->wait_for_data;
+ }
+ 
+-void packet_queue_flush(PacketQueue *q, bool with_flushpacket)
++void packet_queue_flush(PacketQueue *q)
+ {
+     AVPacketList *pkt, *pkt1;
+ 
+@@ -415,9 +408,6 @@ void packet_queue_flush(PacketQueue *q, bool with_flushpacket)
+     q->first_pkt = NULL;
+     q->nb_packets = 0;
+     q->size = 0;
+-    if (with_flushpacket) {
+-        packet_queue_put_flushpacket_private(q);
+-    }
+ }
+ 
+ int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
+@@ -467,13 +457,7 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
+ void packet_queue_start(PacketQueue *q)
+ {
+     Mutex::Autolock autoLock(q->lock);
+-    av_new_packet(&q->flush_pkt, 0);
+     q->abort_request = 0;
+-    packet_queue_put_flushpacket_private(q);
+-}
+-
+-bool packet_queue_is_flushpacket(PacketQueue *q, AVPacket *pkt) {
+-    return (q->flush_pkt.data == pkt->data);
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////////
+diff --git a/utils/ffmpeg_utils.h b/utils/ffmpeg_utils.h
+index d554b1f..51dabcb 100644
+--- a/utils/ffmpeg_utils.h
++++ b/utils/ffmpeg_utils.h
+@@ -70,7 +70,6 @@ int parser_split(AVCodecParameters *avpar, const uint8_t *buf, int buf_size);
+ //////////////////////////////////////////////////////////////////////////////////
+ 
+ typedef struct PacketQueue {
+-    AVPacket flush_pkt;
+     AVPacketList *first_pkt, *last_pkt;
+     int nb_packets;
+     int size;
+@@ -82,14 +81,13 @@ typedef struct PacketQueue {
+ 
+ void packet_queue_init(PacketQueue *q);
+ void packet_queue_destroy(PacketQueue *q);
+-void packet_queue_flush(PacketQueue *q, bool with_flushpacket = false);
++void packet_queue_flush(PacketQueue *q);
+ void packet_queue_start(PacketQueue *q);
+ void packet_queue_abort(PacketQueue *q);
+ int packet_queue_is_wait_for_data(PacketQueue *q);
+ int packet_queue_put(PacketQueue *q, AVPacket *pkt);
+ int packet_queue_put_nullpacket(PacketQueue *q, int stream_index);
+ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block);
+-bool packet_queue_is_flushpacket(PacketQueue *q, AVPacket *pkt);
+ 
+ //////////////////////////////////////////////////////////////////////////////////
+ // misc

@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Fri, 30 Sep 2022 11:13:54 +0200
+Subject: [PATCH 05/13] Re-enable VP9 codec
+
+This requires the fix in ffmpeg to use superframe split BSF for VP9,
+which fixes a long-standing bug with VP9 in stagefright-plugins. This
+fix is not needed for ffmpeg >= 4.0.
+
+Also add VP9 profiles to OMX codecs.
+---
+ data/media_codecs_ffmpeg.xml | 6 ++----
+ omx/SoftFFmpegVideo.cpp      | 9 +++++++++
+ 2 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/data/media_codecs_ffmpeg.xml b/data/media_codecs_ffmpeg.xml
+index 0ee57ff..3203ca0 100644
+--- a/data/media_codecs_ffmpeg.xml
++++ b/data/media_codecs_ffmpeg.xml
+@@ -110,13 +110,11 @@
+             <Limit name="alignment" value="2x2" />
+             <Feature name="adaptive-playback" />
+         </MediaCodec>
+-	<!--
+-	<MediaCodec name="OMX.ffmpeg.vp9.decoder" type="video/x-vnd.on2.vp9">
++        <MediaCodec name="OMX.ffmpeg.vp9.decoder" type="video/x-vnd.on2.vp9">
+             <Limit name="size" min="2x2" max="2048x2048" />
+             <Limit name="alignment" value="2x2" />
+             <Feature name="adaptive-playback" />
+-	</MediaCodec>
+-	-->
++        </MediaCodec>
+         <MediaCodec name="OMX.ffmpeg.rv.decoder"     type="video/vnd.rn-realvideo">
+             <Limit name="size" min="2x2" max="2048x2048" />
+             <Limit name="alignment" value="2x2" />
+diff --git a/omx/SoftFFmpegVideo.cpp b/omx/SoftFFmpegVideo.cpp
+index 62ab10d..4bfc1c1 100644
+--- a/omx/SoftFFmpegVideo.cpp
++++ b/omx/SoftFFmpegVideo.cpp
+@@ -53,6 +53,12 @@ static const CodecProfileLevel kHEVCProfileLevels[] = {
+     { OMX_VIDEO_HEVCProfileMainStill, OMX_VIDEO_HEVCMainTierLevel51 },
+ };
+ 
++static const CodecProfileLevel kVP9ProfileLevels[] = {
++    // Only need to declare the highest supported profile and level here.
++    { OMX_VIDEO_VP9Profile0, OMX_VIDEO_VP9Level5 },
++    { OMX_VIDEO_VP9Profile2, OMX_VIDEO_VP9Level5 },
++};
++
+ SoftFFmpegVideo::SoftFFmpegVideo(
+         const char *name,
+         const char *componentRole,
+@@ -826,6 +832,9 @@ SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
+     } else if (!strcmp(name, "OMX.ffmpeg.hevc.decoder")) {
+         codec_profile_levels = kHEVCProfileLevels;
+         codec_array_size = ARRAY_SIZE(kHEVCProfileLevels);
++    } else if (!strcmp(name, "OMX.ffmpeg.vp9.decoder")) {
++        codec_profile_levels = kVP9ProfileLevels;
++        codec_array_size = ARRAY_SIZE(kVP9ProfileLevels);
+     } else {
+         codec_profile_levels = NULL;
+         codec_array_size = 0;

@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 8 Sep 2022 15:25:59 +0200
+Subject: [PATCH] Disable the legacy su
+
+Change-Id: Iabc4041ce65e5140f2ef24a66bf3631f6f55c57a
+---
+ su/Android.bp | 29 -----------------------------
+ 1 file changed, 29 deletions(-)
+ delete mode 100644 su/Android.bp
+
+diff --git a/su/Android.bp b/su/Android.bp
+deleted file mode 100644
+index 86e44fb4..00000000
+--- a/su/Android.bp
++++ /dev/null
+@@ -1,29 +0,0 @@
+-package {
+-    default_applicable_licenses: ["system_extras_su_license"],
+-}
+-
+-license {
+-    name: "system_extras_su_license",
+-    visibility: [":__subpackages__"],
+-    license_kinds: [
+-        "SPDX-license-identifier-Apache-2.0",
+-    ],
+-    license_text: [
+-        "NOTICE",
+-    ],
+-}
+-
+-cc_binary {
+-    name: "su",
+-
+-    cflags: [
+-        "-Wall",
+-        "-Werror",
+-    ],
+-
+-    srcs: ["su.cpp"],
+-
+-    install_in_xbin: true,
+-
+-    header_libs: ["libcutils_headers"],
+-}

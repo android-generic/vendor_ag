@@ -1,0 +1,81 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Wed, 14 Sep 2022 14:00:38 +0200
+Subject: [PATCH 08/11] Update audio HAL + restore bluetooth HAL
+
+- android.hardware.audio@7.1
+- android.hardware.audio.effect@7.0
+- android.hardware.bluetooth@1.1 (btlinux service)
+- android.hardware.bluetooth.audio@2.1
+---
+ manifest.xml | 15 ++++++++++++---
+ treble.mk    |  7 ++++---
+ 2 files changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/manifest.xml b/manifest.xml
+index fe037b4..7a79a90 100644
+--- a/manifest.xml
++++ b/manifest.xml
+@@ -2,7 +2,7 @@
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+-        <version>6.0</version>
++        <version>7.1</version>
+         <interface>
+             <name>IDevicesFactory</name>
+             <instance>default</instance>
+@@ -11,7 +11,7 @@
+     <hal format="hidl">
+         <name>android.hardware.audio.effect</name>
+         <transport>hwbinder</transport>
+-        <version>6.0</version>
++        <version>7.0</version>
+         <interface>
+             <name>IEffectsFactory</name>
+             <instance>default</instance>
+@@ -20,12 +20,21 @@
+     <hal format="hidl">
+         <name>android.hardware.bluetooth</name>
+         <transport>hwbinder</transport>
+-        <version>1.0</version>
++        <version>1.1</version>
+         <interface>
+             <name>IBluetoothHci</name>
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth.audio</name>
++        <transport>hwbinder</transport>
++        <version>2.1</version>
++        <interface>
++            <name>IBluetoothAudioProvidersFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+     <hal format="hidl">
+         <name>android.hardware.camera.provider</name>
+         <transport>hwbinder</transport>
+diff --git a/treble.mk b/treble.mk
+index 06e3290..6bcff2e 100644
+--- a/treble.mk
++++ b/treble.mk
+@@ -12,13 +12,14 @@ PRODUCT_PACKAGES += \
+ # Audio HAL
+ PRODUCT_PACKAGES += \
+     android.hardware.audio.service \
+-    android.hardware.audio@6.0-impl \
+-    android.hardware.audio.effect@6.0-impl \
++    android.hardware.audio@7.1-impl \
++    android.hardware.audio.effect@7.0-impl \
+     android.hardware.soundtrigger@2.3-impl
+ 
+ # Bluetooth HAL
+ PRODUCT_PACKAGES += \
+-    android.hardware.bluetooth@1.0-service.btlinux
++    android.hardware.bluetooth@1.1-service.btlinux \
++    android.hardware.bluetooth.audio@2.1-impl
+ 
+ # Camera HAL
+ PRODUCT_PACKAGES += \

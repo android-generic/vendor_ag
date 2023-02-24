@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Fri, 16 Sep 2022 14:32:32 +0200
+Subject: [PATCH 10/11] Use wifi supplicant AIDL HAL
+
+---
+ init.x86.rc | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/init.x86.rc b/init.x86.rc
+index 58b3800..198cd28 100644
+--- a/init.x86.rc
++++ b/init.x86.rc
+@@ -57,10 +57,7 @@ service wpa_supplicant /vendor/bin/hw/wpa_supplicant -dd \
+     #   after setting up the capabilities required for WEXT
+     #   user wifi
+     #   group wifi inet keystore
+-    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
+-    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
+-    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
+-    interface android.hardware.wifi.supplicant@1.3::ISupplicant default
++    interface aidl android.hardware.wifi.supplicant.ISupplicant/default
+     class main
+     socket wpa_wlan0 dgram 660 wifi wifi
+     disabled

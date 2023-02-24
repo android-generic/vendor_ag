@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Sun, 23 Oct 2022 13:58:07 +0200
+Subject: [PATCH 9/9] Fix compilation with clang on x86
+
+- disable availability of EBX: fixes compilation error with inline
+  assembly in libavcodec/x86/cabac.h
+- fixes Wincompatible-pointer-types and Wformat errors in vaapi
+---
+ android/config-x86-x86.mak       | 2 +-
+ android/include/config-x86-x86.h | 2 +-
+ android/include/config-x86.asm   | 2 +-
+ configure                        | 1 +
+ libavutil/hwcontext_vaapi.c      | 6 +++---
+ 5 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/android/config-x86-x86.mak b/android/config-x86-x86.mak
+index bddd65db0c..82acaf60cf 100644
+--- a/android/config-x86-x86.mak
++++ b/android/config-x86-x86.mak
+@@ -360,7 +360,7 @@ HAVE_PTHREADS=yes
+ !HAVE_ASM_MOD_Q=yes
+ !HAVE_BLOCKS_EXTENSION=yes
+ HAVE_EBP_AVAILABLE=yes
+-HAVE_EBX_AVAILABLE=yes
++!HAVE_EBX_AVAILABLE=yes
+ !HAVE_GNU_AS=yes
+ !HAVE_GNU_WINDRES=yes
+ !HAVE_IBM_ASM=yes
+diff --git a/android/include/config-x86-x86.h b/android/include/config-x86-x86.h
+index 9fea319809..ae523155a9 100644
+--- a/android/include/config-x86-x86.h
++++ b/android/include/config-x86-x86.h
+@@ -1381,7 +1381,7 @@
+ #ifdef HAVE_EBX_AVAILABLE
+ #undef HAVE_EBX_AVAILABLE
+ #endif
+-#define HAVE_EBX_AVAILABLE 1
++#define HAVE_EBX_AVAILABLE 0
+ #ifdef HAVE_GNU_AS
+ #undef HAVE_GNU_AS
+ #endif
+diff --git a/android/include/config-x86.asm b/android/include/config-x86.asm
+index 43e1a030aa..f90f46d817 100644
+--- a/android/include/config-x86.asm
++++ b/android/include/config-x86.asm
+@@ -339,7 +339,7 @@
+ %define HAVE_ASM_MOD_Q 0
+ %define HAVE_BLOCKS_EXTENSION 0
+ %define HAVE_EBP_AVAILABLE 1
+-%define HAVE_EBX_AVAILABLE 1
++%define HAVE_EBX_AVAILABLE 0
+ %define HAVE_GNU_AS 0
+ %define HAVE_GNU_WINDRES 0
+ %define HAVE_IBM_ASM 0
+diff --git a/configure b/configure
+index 02245dd01f..0c730e2d55 100755
+--- a/configure
++++ b/configure
+@@ -6965,6 +6965,7 @@ if enabled x86; then
+             vp9_vaapi_hwaccel_deps="vaapi"
+             enable vaapi vaapi_1 vaapi_android
+             enable libdrm libdrm_getfb2 linux_dma_buf_h
++            enabled x86_32 && disable ebx_available
+             ;&
+         *)
+             disable ffnvcodec cuvid nvdec nvenc
+diff --git a/libavutil/hwcontext_vaapi.c b/libavutil/hwcontext_vaapi.c
+index e2d0217fe1..09af6c8418 100644
+--- a/libavutil/hwcontext_vaapi.c
++++ b/libavutil/hwcontext_vaapi.c
+@@ -1046,7 +1046,7 @@ static int vaapi_map_from_drm(AVHWFramesContext *src_fc, AVFrame *dst,
+     int err, i, j;
+ 
+ #if !VA_CHECK_VERSION(1, 1, 0)
+-    unsigned long buffer_handle;
++    uintptr_t buffer_handle;
+     VASurfaceAttribExternalBuffers buffer_desc;
+     VASurfaceAttrib attrs[2] = {
+         {
+@@ -1163,7 +1163,7 @@ static int vaapi_map_from_drm(AVHWFramesContext *src_fc, AVFrame *dst,
+ 
+     if (!use_prime2 || vas != VA_STATUS_SUCCESS) {
+         int k;
+-        unsigned long buffer_handle;
++        uintptr_t buffer_handle;
+         VASurfaceAttribExternalBuffers buffer_desc;
+         VASurfaceAttrib buffer_attrs[2] = {
+             {
+@@ -1484,7 +1484,7 @@ static int vaapi_map_to_drm_abh(AVHWFramesContext *hwfc, AVFrame *dst,
+         goto fail_derived;
+     }
+ 
+-    av_log(hwfc, AV_LOG_DEBUG, "DRM PRIME fd is %ld.\n",
++    av_log(hwfc, AV_LOG_DEBUG, "DRM PRIME fd is %" PRIdPTR ".\n",
+            mapping->buffer_info.handle);
+ 
+     mapping->drm_desc.nb_objects = 1;

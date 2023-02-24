@@ -1,0 +1,240 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Mon, 10 Oct 2022 18:12:22 +0200
+Subject: [PATCH 7/9] Enable libdrm support in VA-API
+
+This allows direct access to VA-API surface content through
+AV_PIX_FMT_DRM_PRIME.
+---
+ android/config-x86-x86.mak             | 6 +++---
+ android/config-x86_64-x86_64.mak       | 6 +++---
+ android/include/config-x86-x86.h       | 6 +++---
+ android/include/config-x86.asm         | 6 +++---
+ android/include/config-x86_64-x86_64.h | 6 +++---
+ android/include/config-x86_64.asm      | 6 +++---
+ configure                              | 1 +
+ libavutil/Android.mk                   | 6 ++++--
+ 8 files changed, 23 insertions(+), 20 deletions(-)
+
+diff --git a/android/config-x86-x86.mak b/android/config-x86-x86.mak
+index df4b9db69b..bddd65db0c 100644
+--- a/android/config-x86-x86.mak
++++ b/android/config-x86-x86.mak
+@@ -232,7 +232,7 @@ HAVE_DIRENT_H=yes
+ !HAVE_ES2_GL_H=yes
+ !HAVE_GSM_H=yes
+ !HAVE_IO_H=yes
+-!HAVE_LINUX_DMA_BUF_H=yes
++HAVE_LINUX_DMA_BUF_H=yes
+ HAVE_LINUX_PERF_EVENT_H=yes
+ !HAVE_MACHINE_IOCTL_BT848_H=yes
+ !HAVE_MACHINE_IOCTL_METEOR_H=yes
+@@ -406,7 +406,7 @@ HAVE_STRUCT_SOCKADDR_STORAGE=yes
+ HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC=yes
+ !HAVE_STRUCT_V4L2_FRMIVALENUM_DISCRETE=yes
+ HAVE_GZIP=yes
+-!HAVE_LIBDRM_GETFB2=yes
++HAVE_LIBDRM_GETFB2=yes
+ !HAVE_MAKEINFO=yes
+ !HAVE_MAKEINFO_HTML=yes
+ !HAVE_OPENCL_D3D11=yes
+@@ -486,7 +486,7 @@ CONFIG_VAAPI_TRANSCODE_EXAMPLE=yes
+ !CONFIG_LIBCODEC2=yes
+ !CONFIG_LIBDAV1D=yes
+ !CONFIG_LIBDC1394=yes
+-!CONFIG_LIBDRM=yes
++CONFIG_LIBDRM=yes
+ !CONFIG_LIBFLITE=yes
+ !CONFIG_LIBFONTCONFIG=yes
+ !CONFIG_LIBFREETYPE=yes
+diff --git a/android/config-x86_64-x86_64.mak b/android/config-x86_64-x86_64.mak
+index 84220f43b8..5bec3d1211 100644
+--- a/android/config-x86_64-x86_64.mak
++++ b/android/config-x86_64-x86_64.mak
+@@ -232,7 +232,7 @@ HAVE_DIRENT_H=yes
+ !HAVE_ES2_GL_H=yes
+ !HAVE_GSM_H=yes
+ !HAVE_IO_H=yes
+-!HAVE_LINUX_DMA_BUF_H=yes
++HAVE_LINUX_DMA_BUF_H=yes
+ HAVE_LINUX_PERF_EVENT_H=yes
+ !HAVE_MACHINE_IOCTL_BT848_H=yes
+ !HAVE_MACHINE_IOCTL_METEOR_H=yes
+@@ -406,7 +406,7 @@ HAVE_STRUCT_SOCKADDR_STORAGE=yes
+ HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC=yes
+ !HAVE_STRUCT_V4L2_FRMIVALENUM_DISCRETE=yes
+ HAVE_GZIP=yes
+-!HAVE_LIBDRM_GETFB2=yes
++HAVE_LIBDRM_GETFB2=yes
+ !HAVE_MAKEINFO=yes
+ !HAVE_MAKEINFO_HTML=yes
+ !HAVE_OPENCL_D3D11=yes
+@@ -486,7 +486,7 @@ CONFIG_VAAPI_TRANSCODE_EXAMPLE=yes
+ !CONFIG_LIBCODEC2=yes
+ !CONFIG_LIBDAV1D=yes
+ !CONFIG_LIBDC1394=yes
+-!CONFIG_LIBDRM=yes
++CONFIG_LIBDRM=yes
+ !CONFIG_LIBFLITE=yes
+ !CONFIG_LIBFONTCONFIG=yes
+ !CONFIG_LIBFREETYPE=yes
+diff --git a/android/include/config-x86-x86.h b/android/include/config-x86-x86.h
+index b4dd0cf700..9fea319809 100644
+--- a/android/include/config-x86-x86.h
++++ b/android/include/config-x86-x86.h
+@@ -869,7 +869,7 @@
+ #ifdef HAVE_LINUX_DMA_BUF_H
+ #undef HAVE_LINUX_DMA_BUF_H
+ #endif
+-#define HAVE_LINUX_DMA_BUF_H 0
++#define HAVE_LINUX_DMA_BUF_H 1
+ #ifdef HAVE_LINUX_PERF_EVENT_H
+ #undef HAVE_LINUX_PERF_EVENT_H
+ #endif
+@@ -1565,7 +1565,7 @@
+ #ifdef HAVE_LIBDRM_GETFB2
+ #undef HAVE_LIBDRM_GETFB2
+ #endif
+-#define HAVE_LIBDRM_GETFB2 0
++#define HAVE_LIBDRM_GETFB2 1
+ #ifdef HAVE_MAKEINFO
+ #undef HAVE_MAKEINFO
+ #endif
+@@ -1684,7 +1684,7 @@
+ #define CONFIG_LIBCODEC2 0
+ #define CONFIG_LIBDAV1D 0
+ #define CONFIG_LIBDC1394 0
+-#define CONFIG_LIBDRM 0
++#define CONFIG_LIBDRM 1
+ #define CONFIG_LIBFLITE 0
+ #define CONFIG_LIBFONTCONFIG 0
+ #define CONFIG_LIBFREETYPE 0
+diff --git a/android/include/config-x86.asm b/android/include/config-x86.asm
+index 9d58ba6fe6..43e1a030aa 100644
+--- a/android/include/config-x86.asm
++++ b/android/include/config-x86.asm
+@@ -211,7 +211,7 @@
+ %define HAVE_ES2_GL_H 0
+ %define HAVE_GSM_H 0
+ %define HAVE_IO_H 0
+-%define HAVE_LINUX_DMA_BUF_H 0
++%define HAVE_LINUX_DMA_BUF_H 1
+ %define HAVE_LINUX_PERF_EVENT_H 1
+ %define HAVE_MACHINE_IOCTL_BT848_H 0
+ %define HAVE_MACHINE_IOCTL_METEOR_H 0
+@@ -385,7 +385,7 @@
+ %define HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC 1
+ %define HAVE_STRUCT_V4L2_FRMIVALENUM_DISCRETE 0
+ %define HAVE_GZIP 1
+-%define HAVE_LIBDRM_GETFB2 0
++%define HAVE_LIBDRM_GETFB2 1
+ %define HAVE_MAKEINFO 0
+ %define HAVE_MAKEINFO_HTML 0
+ %define HAVE_OPENCL_D3D11 0
+@@ -465,7 +465,7 @@
+ %define CONFIG_LIBCODEC2 0
+ %define CONFIG_LIBDAV1D 0
+ %define CONFIG_LIBDC1394 0
+-%define CONFIG_LIBDRM 0
++%define CONFIG_LIBDRM 1
+ %define CONFIG_LIBFLITE 0
+ %define CONFIG_LIBFONTCONFIG 0
+ %define CONFIG_LIBFREETYPE 0
+diff --git a/android/include/config-x86_64-x86_64.h b/android/include/config-x86_64-x86_64.h
+index 24a057dd80..ddd6454265 100644
+--- a/android/include/config-x86_64-x86_64.h
++++ b/android/include/config-x86_64-x86_64.h
+@@ -869,7 +869,7 @@
+ #ifdef HAVE_LINUX_DMA_BUF_H
+ #undef HAVE_LINUX_DMA_BUF_H
+ #endif
+-#define HAVE_LINUX_DMA_BUF_H 0
++#define HAVE_LINUX_DMA_BUF_H 1
+ #ifdef HAVE_LINUX_PERF_EVENT_H
+ #undef HAVE_LINUX_PERF_EVENT_H
+ #endif
+@@ -1565,7 +1565,7 @@
+ #ifdef HAVE_LIBDRM_GETFB2
+ #undef HAVE_LIBDRM_GETFB2
+ #endif
+-#define HAVE_LIBDRM_GETFB2 0
++#define HAVE_LIBDRM_GETFB2 1
+ #ifdef HAVE_MAKEINFO
+ #undef HAVE_MAKEINFO
+ #endif
+@@ -1684,7 +1684,7 @@
+ #define CONFIG_LIBCODEC2 0
+ #define CONFIG_LIBDAV1D 0
+ #define CONFIG_LIBDC1394 0
+-#define CONFIG_LIBDRM 0
++#define CONFIG_LIBDRM 1
+ #define CONFIG_LIBFLITE 0
+ #define CONFIG_LIBFONTCONFIG 0
+ #define CONFIG_LIBFREETYPE 0
+diff --git a/android/include/config-x86_64.asm b/android/include/config-x86_64.asm
+index e929256884..827afd2634 100644
+--- a/android/include/config-x86_64.asm
++++ b/android/include/config-x86_64.asm
+@@ -211,7 +211,7 @@
+ %define HAVE_ES2_GL_H 0
+ %define HAVE_GSM_H 0
+ %define HAVE_IO_H 0
+-%define HAVE_LINUX_DMA_BUF_H 0
++%define HAVE_LINUX_DMA_BUF_H 1
+ %define HAVE_LINUX_PERF_EVENT_H 1
+ %define HAVE_MACHINE_IOCTL_BT848_H 0
+ %define HAVE_MACHINE_IOCTL_METEOR_H 0
+@@ -385,7 +385,7 @@
+ %define HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC 1
+ %define HAVE_STRUCT_V4L2_FRMIVALENUM_DISCRETE 0
+ %define HAVE_GZIP 1
+-%define HAVE_LIBDRM_GETFB2 0
++%define HAVE_LIBDRM_GETFB2 1
+ %define HAVE_MAKEINFO 0
+ %define HAVE_MAKEINFO_HTML 0
+ %define HAVE_OPENCL_D3D11 0
+@@ -465,7 +465,7 @@
+ %define CONFIG_LIBCODEC2 0
+ %define CONFIG_LIBDAV1D 0
+ %define CONFIG_LIBDC1394 0
+-%define CONFIG_LIBDRM 0
++%define CONFIG_LIBDRM 1
+ %define CONFIG_LIBFLITE 0
+ %define CONFIG_LIBFONTCONFIG 0
+ %define CONFIG_LIBFREETYPE 0
+diff --git a/configure b/configure
+index 51a8302769..02245dd01f 100755
+--- a/configure
++++ b/configure
+@@ -6964,6 +6964,7 @@ if enabled x86; then
+             hevc_vaapi_hwaccel_deps="vaapi"
+             vp9_vaapi_hwaccel_deps="vaapi"
+             enable vaapi vaapi_1 vaapi_android
++            enable libdrm libdrm_getfb2 linux_dma_buf_h
+             ;&
+         *)
+             disable ffnvcodec cuvid nvdec nvenc
+diff --git a/libavutil/Android.mk b/libavutil/Android.mk
+index a4c34bae7a..380da7791f 100644
+--- a/libavutil/Android.mk
++++ b/libavutil/Android.mk
+@@ -16,7 +16,8 @@ include $(LOCAL_PATH)/../android/build.mk
+ ifeq ($(CONFIG_VAAPI),yes)
+ LOCAL_SHARED_LIBRARIES +=	\
+ 	libva \
+-	libva-android
++	libva-android \
++	libdrm
+ endif
+ 
+ LOCAL_C_INCLUDES += bionic/libc/include
+@@ -33,7 +34,8 @@ include $(LOCAL_PATH)/../android/build.mk
+ ifeq ($(CONFIG_VAAPI),yes)
+ LOCAL_SHARED_LIBRARIES +=	\
+ 	libva \
+-	libva-android
++	libva-android \
++	libdrm
+ endif
+ 
+ LOCAL_C_INCLUDES += bionic/libc/include

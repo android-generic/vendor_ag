@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 8 Dec 2022 13:57:14 +0100
+Subject: [PATCH] Allow loading vulkan from /vendor/${LIB}/hw
+
+This fixes loading vulkan driver in legacy (non-treble) mode.
+
+Change-Id: Ifa46a97d75cd24c067affada175665215e13273f
+---
+ contents/namespace/systemdefault.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/contents/namespace/systemdefault.cc b/contents/namespace/systemdefault.cc
+index 0d5c42b..8b38d3a 100644
+--- a/contents/namespace/systemdefault.cc
++++ b/contents/namespace/systemdefault.cc
+@@ -103,6 +103,7 @@ Namespace BuildSystemDefaultNamespace([[maybe_unused]] const Context& ctx) {
+   }
+   if (!is_fully_treblelized) {
+     ns.AddSearchPath("/vendor/${LIB}");
++    ns.AddSearchPath("/vendor/${LIB}/hw");
+     ns.AddSearchPath("/odm/${LIB}");
+   }
+ 

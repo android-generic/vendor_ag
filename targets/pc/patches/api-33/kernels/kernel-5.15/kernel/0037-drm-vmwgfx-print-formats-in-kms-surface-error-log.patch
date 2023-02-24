@@ -1,0 +1,25 @@
+From d489c8022ab491264d89a2c65127bfb0c50afbf9 Mon Sep 17 00:00:00 2001
+From: Mauro Rossi <issor.oruam@gmail.com>
+Date: Sun, 16 Dec 2018 09:53:09 +0100
+Subject: [PATCH 37/54] drm/vmwgfx: print formats in kms surface error log
+
+---
+ drivers/gpu/drm/vmwgfx/vmwgfx_kms.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+index 171e90c4b9f3..e009dbe601a7 100644
+--- a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
++++ b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+@@ -963,7 +963,7 @@ static int vmw_kms_new_framebuffer_surface(struct vmw_private *dev_priv,
+ 	 * is set.
+ 	 */
+ 	if (!has_sm4_context(dev_priv) && format != surface->metadata.format) {
+-		DRM_ERROR("Invalid surface format for requested mode.\n");
++		DRM_ERROR("Invalid surface format %d for requested mode format %d\n", surface->metadata.format, format);
+ 		return -EINVAL;
+ 	}
+ 
+-- 
+2.34.1
+

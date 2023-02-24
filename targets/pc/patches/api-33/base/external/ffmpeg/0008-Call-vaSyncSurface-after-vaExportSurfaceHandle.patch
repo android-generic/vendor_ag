@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 13 Oct 2022 11:08:29 +0200
+Subject: [PATCH 8/9] Call vaSyncSurface after vaExportSurfaceHandle
+
+The VA-API documentation states that no symchronization is performed in
+vaExportSurfaceHandle, and client should use vaSyncSurface before
+reading from the exported handle. Exporting a VA-API frame to DRM using
+ffmpeg API is pretty useless if one cannot read from the handle and
+clients are forced to access VA-API internals to do the sync themselves.
+---
+ libavutil/hwcontext_vaapi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/libavutil/hwcontext_vaapi.c b/libavutil/hwcontext_vaapi.c
+index 01ac91c33b..e2d0217fe1 100644
+--- a/libavutil/hwcontext_vaapi.c
++++ b/libavutil/hwcontext_vaapi.c
+@@ -1306,6 +1306,7 @@ static int vaapi_map_to_drm_esh(AVHWFramesContext *hwfc, AVFrame *dst,
+                "%d (%s).\n", surface_id, vas, vaErrorStr(vas));
+         return AVERROR(EIO);
+     }
++    vaSyncSurface(hwctx->display, surface_id);
+ 
+     drm_desc = av_mallocz(sizeof(*drm_desc));
+     if (!drm_desc) {

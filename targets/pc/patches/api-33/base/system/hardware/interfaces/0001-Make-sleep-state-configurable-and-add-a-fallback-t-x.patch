@@ -1,0 +1,104 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chih-Wei Huang <cwhuang@linux.org.tw>
+Date: Mon, 20 Apr 2020 18:43:48 +0800
+Subject: [PATCH 1/2] Make sleep state configurable and add a fallback (t-x86)
+
+This patch allows the user to set the sleep state target from
+Android properties for wakeup_count method.
+
+It also includes a fallback state if the default state is not
+available and the user didn't set the sleep.state property.
+
+Changelog:
+(r-x86) Resolve conflict in suspend/1.0/default/SystemSuspend.cpp
+
+Change-Id: Id4024dfc3d84c1d30681e69fad2485851935f717
+---
+ suspend/1.0/default/SystemSuspend.cpp | 25 +++++++++++++++++++++++--
+ suspend/1.0/default/SystemSuspend.h   |  2 ++
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/suspend/1.0/default/SystemSuspend.cpp b/suspend/1.0/default/SystemSuspend.cpp
+index 5e5a745..b3c7c5e 100644
+--- a/suspend/1.0/default/SystemSuspend.cpp
++++ b/suspend/1.0/default/SystemSuspend.cpp
+@@ -20,6 +20,7 @@
+ #include <aidl/android/system/suspend/IWakeLock.h>
+ #include <android-base/file.h>
+ #include <android-base/logging.h>
++#include <android-base/properties.h>
+ #include <android-base/stringprintf.h>
+ #include <android-base/strings.h>
+ #include <android/binder_manager.h>
+@@ -36,6 +37,7 @@ using ::aidl::android::system::suspend::ISystemSuspend;
+ using ::aidl::android::system::suspend::IWakeLock;
+ using ::aidl::android::system::suspend::WakeLockType;
+ using ::android::base::Error;
++using ::android::base::GetProperty;
+ using ::android::base::ReadFdToString;
+ using ::android::base::WriteStringToFd;
+ using ::std::string;
+@@ -228,7 +230,7 @@ bool SystemSuspend::forceSuspend() {
+     //  returns from suspend, the wakelocks and SuspendCounter will not have
+     //  changed.
+     auto autosuspendLock = std::unique_lock(mAutosuspendLock);
+-    bool success = WriteStringToFd(kSleepState, mStateFd);
++    bool success = WriteStringToFd(getSleepState(), mStateFd);
+     autosuspendLock.unlock();
+ 
+     if (!success) {
+@@ -350,7 +352,7 @@ void SystemSuspend::initAutosuspendLocked() {
+                     PLOG(VERBOSE) << "error writing to /sys/power/wakeup_count";
+                     continue;
+                 }
+-                success = WriteStringToFd(kSleepState, mStateFd);
++                success = WriteStringToFd(getSleepState(), mStateFd);
+                 shouldSleep = true;
+ 
+                 autosuspendLock.unlock();
+@@ -383,6 +385,25 @@ void SystemSuspend::initAutosuspendLocked() {
+     LOG(INFO) << "automatic system suspend enabled";
+ }
+ 
++const string &SystemSuspend::getSleepState() {
++    if (mSleepState.empty()) {
++        mSleepState = GetProperty("sleep.state", "");
++        if (!mSleepState.empty()) {
++            LOG(INFO) << "autosuspend using sleep.state property " << mSleepState;
++        } else {
++            string buf = readFd(mStateFd);
++            if (buf.find(kSleepState) != std::string::npos) {
++                mSleepState = kSleepState;
++                LOG(INFO) << "autosuspend using default sleep_state " << mSleepState;
++            } else {
++                mSleepState = "freeze";
++                LOG(WARNING) << "autosuspend using fallback state " << mSleepState;
++            }
++        }
++    }
++    return mSleepState;
++}
++
+ /**
+  * Updates sleep time depending on the result of suspend attempt.
+  * Time (in milliseconds) between suspend attempts is described the formula
+diff --git a/suspend/1.0/default/SystemSuspend.h b/suspend/1.0/default/SystemSuspend.h
+index a3f9a00..39839c7 100644
+--- a/suspend/1.0/default/SystemSuspend.h
++++ b/suspend/1.0/default/SystemSuspend.h
+@@ -112,6 +112,7 @@ class SystemSuspend : public RefBase {
+     void checkAutosuspendClientsLivenessLocked()
+         EXCLUSIVE_LOCKS_REQUIRED(mAutosuspendClientTokensLock);
+     bool hasAliveAutosuspendTokenLocked() EXCLUSIVE_LOCKS_REQUIRED(mAutosuspendClientTokensLock);
++    const std::string &getSleepState();
+ 
+     std::condition_variable mAutosuspendCondVar GUARDED_BY(mAutosuspendLock);
+     uint32_t mSuspendCounter GUARDED_BY(mAutosuspendLock);
+@@ -122,6 +123,7 @@ class SystemSuspend : public RefBase {
+ 
+     unique_fd mWakeupCountFd;
+     unique_fd mStateFd;
++    std::string mSleepState;
+ 
+     unique_fd mSuspendStatsFd;
+     unique_fd mSuspendTimeFd;

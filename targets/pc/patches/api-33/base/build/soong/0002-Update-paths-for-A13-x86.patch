@@ -1,0 +1,48 @@
+From f323bfa7f8be890af9a7b08d2eb97ca990f963cc Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Thu, 2 Feb 2023 12:21:02 -0500
+Subject: [PATCH 2/2] Update paths for A13-x86
+
+Change-Id: I457310255ddb9b6893f523580c8107ea666c7bf3
+---
+ ui/build/paths/config.go | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/ui/build/paths/config.go b/ui/build/paths/config.go
+index b5be255fe..ea036b096 100644
+--- a/ui/build/paths/config.go
++++ b/ui/build/paths/config.go
+@@ -83,11 +83,13 @@ var Configuration = map[string]PathConfig{
+ 	"getopt":  Allowed,
+ 	"git":     Allowed,
+ 	"hexdump": Allowed,
++        "install": Allowed,
+ 	"jar":     Allowed,
+ 	"java":    Allowed,
+ 	"javap":   Allowed,
+ 	"lsof":    Allowed,
+ 	"openssl": Allowed,
++	"perl":    Allowed,
+ 	"pstree":  Allowed,
+ 	"rsync":   Allowed,
+ 	"sh":      Allowed,
+@@ -95,13 +97,11 @@ var Configuration = map[string]PathConfig{
+ 	"tr":      Allowed,
+ 	"unzip":   Allowed,
+ 	"zip":     Allowed,
+-	"aarch64-linux-gnu-as": Allowed,
+-	"aarch64-linux-gnu-ld": Allowed,
+-        "x86-linux-gnu-as":     Allowed,
+-        "x86-linux-gnu-ld":     Allowed,
+         "x86_64-linux-gnu-as":     Allowed,
+         "x86_64-linux-gnu-ld":     Allowed,
+-
++	"x86_64-linux-androidkernel-as": Allowed,
++	"x86_64-linux-androidkernel-ld": Allowed,
++	"x86_64-linux-androidkernel-objcopy": Allowed,
+ 
+ 	// Host toolchain is removed. In-tree toolchain should be used instead.
+ 	// GCC also can't find cc1 with this implementation.
+-- 
+2.34.1
+

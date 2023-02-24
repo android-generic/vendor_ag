@@ -1,0 +1,31 @@
+From 31c3fed7333ec46a574fcab5fd951dc50f472ca9 Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Tue, 31 Jan 2023 19:41:41 -0500
+Subject: [PATCH 1/2] Allow configurations for *linux-gnu-ld & *linux-gnu-as
+
+Change-Id: I5f5b0f24ac9d301e7b332e551fbca8a571349d5c
+---
+ ui/build/paths/config.go | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/ui/build/paths/config.go b/ui/build/paths/config.go
+index 831a80f97..b5be255fe 100644
+--- a/ui/build/paths/config.go
++++ b/ui/build/paths/config.go
+@@ -95,6 +95,13 @@ var Configuration = map[string]PathConfig{
+ 	"tr":      Allowed,
+ 	"unzip":   Allowed,
+ 	"zip":     Allowed,
++	"aarch64-linux-gnu-as": Allowed,
++	"aarch64-linux-gnu-ld": Allowed,
++        "x86-linux-gnu-as":     Allowed,
++        "x86-linux-gnu-ld":     Allowed,
++        "x86_64-linux-gnu-as":     Allowed,
++        "x86_64-linux-gnu-ld":     Allowed,
++
+ 
+ 	// Host toolchain is removed. In-tree toolchain should be used instead.
+ 	// GCC also can't find cc1 with this implementation.
+-- 
+2.34.1
+

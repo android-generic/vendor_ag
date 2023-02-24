@@ -1,0 +1,99 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Tue, 3 Jan 2023 09:26:33 -0500
+Subject: [PATCH 3/3] Update bluetooth audio xml to 7.0
+
+Partially obtained using the helper script
+hardware/interfaces/audio/7.0/config/update_audio_policy_config.sh
+---
+ alsa.mk                                |  4 ++--
+ audio_policy_configuration.xml         |  6 +++---
+ primary_audio_policy_configuration.xml | 18 +++++++++---------
+ 3 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/alsa.mk b/alsa.mk
+index d5cd06d..dae6472 100644
+--- a/alsa.mk
++++ b/alsa.mk
+@@ -45,8 +45,8 @@ PRODUCT_COPY_FILES := \
+ 	$(foreach f,$(copy_init),$(LOCAL_ALSA_INIT_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/init/$(f)) \
+ 	$(LOCAL_PATH)/primary_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/primary_audio_policy_configuration.xml \
+ 	$(LOCAL_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+-	frameworks/av/services/audiopolicy/config/a2dp_in_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_in_audio_policy_configuration.xml \
+-	frameworks/av/services/audiopolicy/config/bluetooth_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth_audio_policy_configuration.xml \
++	frameworks/av/services/audiopolicy/config/a2dp_in_audio_policy_configuration_7_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_in_audio_policy_configuration_7_0.xml \
++	frameworks/av/services/audiopolicy/config/bluetooth_audio_policy_configuration_7_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth_audio_policy_configuration_7_0.xml \
+ 	frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+ 	frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+ 	frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+diff --git a/audio_policy_configuration.xml b/audio_policy_configuration.xml
+index c79ad37..e003495 100644
+--- a/audio_policy_configuration.xml
++++ b/audio_policy_configuration.xml
+@@ -14,7 +14,7 @@
+      limitations under the License.
+ -->
+ 
+-<audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
++<audioPolicyConfiguration version="7.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+     <!-- version section contains a “version” tag in the form “major.minor” e.g version=”1.0” -->
+ 
+     <!-- Global configuration Decalaration -->
+@@ -26,10 +26,10 @@
+         <xi:include href="primary_audio_policy_configuration.xml"/>
+ 
+         <!-- A2dp Input Audio HAL -->
+-        <xi:include href="a2dp_in_audio_policy_configuration.xml"/>
++        <xi:include href="a2dp_in_audio_policy_configuration_7_0.xml"/>
+ 
+         <!-- Bluetooth Audio HAL -->
+-        <xi:include href="bluetooth_audio_policy_configuration.xml"/>
++        <xi:include href="bluetooth_audio_policy_configuration_7_0.xml"/>
+ 
+         <!-- Usb Audio HAL -->
+         <xi:include href="usb_audio_policy_configuration.xml"/>
+diff --git a/primary_audio_policy_configuration.xml b/primary_audio_policy_configuration.xml
+index 652dfcc..e04afe3 100644
+--- a/primary_audio_policy_configuration.xml
++++ b/primary_audio_policy_configuration.xml
+@@ -13,8 +13,8 @@
+         </mixPort>
+         <mixPort name="primary input" role="sink">
+             <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+-                     channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
++                     samplingRates="8000 11025 16000 22050 24000 32000 44100 48000"
++                     channelMasks="AUDIO_CHANNEL_IN_MONO AUDIO_CHANNEL_IN_STEREO"/>
+         </mixPort>
+    </mixPorts>
+    <devicePorts>
+@@ -44,22 +44,22 @@
+ 	</devicePort>
+         <devicePort tagName="HDMI Out" type="AUDIO_DEVICE_OUT_AUX_DIGITAL" role="sink">
+ 		<profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-			samplingRates="48000" channelMasks="dynamic"/>
++			samplingRates="48000"/>
+         </devicePort>
+         <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
+ 		<profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-			samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+-			channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
++			samplingRates="8000 11025 16000 22050 24000 32000 44100 48000"
++			channelMasks="AUDIO_CHANNEL_IN_MONO AUDIO_CHANNEL_IN_STEREO"/>
+         </devicePort>
+         <devicePort tagName="Wired Headset Mic" type="AUDIO_DEVICE_IN_WIRED_HEADSET" role="source">
+ 		<profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-			samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+-			channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
++			samplingRates="8000 11025 16000 22050 24000 32000 44100 48000"
++			channelMasks="AUDIO_CHANNEL_IN_MONO AUDIO_CHANNEL_IN_STEREO"/>
+         </devicePort>
+         <devicePort tagName="BT SCO Headset Mic" type="AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET" role="source">
+ 		<profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-			samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+-			channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
++			samplingRates="8000 11025 16000 22050 24000 32000 44100 48000"
++			channelMasks="AUDIO_CHANNEL_IN_MONO AUDIO_CHANNEL_IN_STEREO"/>
+         </devicePort>
+     </devicePorts>
+     <routes>

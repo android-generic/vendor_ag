@@ -1,0 +1,495 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 22 Sep 2022 08:00:17 +0200
+Subject: [PATCH 02/13] Reorganize code and make files
+
+This implements better isolation (or dependency) between the modules.
+
+- move OMX_FFMPEG_Extn.h to frameworks/av
+- move FFmpegComponents.h to omx
+- move ffmpeg_hwaccel to utils
+- re-export required headers from utils module
+- move all shared_libs/headers dependencies into module's Android.mk
+- remove LOCAL_C_INCLUDES deps, use shared_libs/headers instead
+- prune LOCAL_C_FLAGS to only necessary ones
+- prune #include in ffmpeg_utils.h to only sensible ones
+---
+ common.mk                           |  32 +-----
+ extractor/Android.mk                |  11 +-
+ extractor/FFmpegExtractor.cpp       |   4 +-
+ extractor/FFmpegExtractor.h         |   2 +-
+ include/OMX_FFMPEG_Extn.h           | 154 ----------------------------
+ omx/Android.mk                      |  17 ++-
+ {include => omx}/FFmpegComponents.h |   4 +-
+ omx/FFmpegOMXPlugin.h               |   7 +-
+ omx/SoftFFmpegAudio.h               |   2 +-
+ omx/SoftFFmpegVideo.h               |   2 +-
+ utils/Android.mk                    |  23 ++++-
+ utils/codec_utils.h                 |   1 +
+ {omx => utils}/ffmpeg_hwaccel.c     |   0
+ {omx => utils}/ffmpeg_hwaccel.h     |   0
+ utils/ffmpeg_utils.h                |  16 ---
+ 15 files changed, 52 insertions(+), 223 deletions(-)
+ delete mode 100644 include/OMX_FFMPEG_Extn.h
+ rename {include => omx}/FFmpegComponents.h (98%)
+ rename {omx => utils}/ffmpeg_hwaccel.c (100%)
+ rename {omx => utils}/ffmpeg_hwaccel.h (100%)
+
+diff --git a/common.mk b/common.mk
+index db6610b..c29b1ef 100644
+--- a/common.mk
++++ b/common.mk
+@@ -16,35 +16,13 @@
+ 
+ include $(CLEAR_VARS)
+ 
++# Include base FFMPEG definitions.
+ include external/$(AV_CODEC_LIB)/android/$(AV_CODEC_LIB).mk
+ 
+-# put the libraries to /vendor
+-LOCAL_PROPRIETARY_MODULE := true
+-
+-LOCAL_C_INCLUDES += \
+-	$(LOCAL_PATH)/../include \
+-	$(LOCAL_PATH)/.. \
+-	frameworks/native/include/media/openmax \
+-	frameworks/av/include \
+-	frameworks/av/media/libstagefright
+-
+-LOCAL_SHARED_LIBRARIES := \
+-	libutils \
+-	libcutils \
+-	libavcodec \
+-	libavformat \
+-	libavutil \
+-	libstagefright \
+-	libstagefright_foundation
+-
+-ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
+-	LOCAL_CFLAGS += -Wno-psabi
+-endif
+-
++# Some flags to work with FFMEG headers.
+ LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
++LOCAL_CFLAGS += -Wno-deprecated-declarations
+ 
+-# Quiet some noise
+-LOCAL_CFLAGS += -Wno-deprecated-declarations -Wno-unused-parameter
+-LOCAL_CLANG_CFLAGS += -Wno-unknown-attributes
+-
++# All modules are installed on /vendor and optional.
++LOCAL_PROPRIETARY_MODULE := true
+ LOCAL_MODULE_TAGS := optional
+diff --git a/extractor/Android.mk b/extractor/Android.mk
+index c41ece0..58cda50 100644
+--- a/extractor/Android.mk
++++ b/extractor/Android.mk
+@@ -6,10 +6,15 @@ LOCAL_SRC_FILES := \
+ 	FFmpegExtractor.cpp
+ 
+ LOCAL_SHARED_LIBRARIES += \
+-	libbinder         \
++	libavcodec        \
++	libavformat       \
++	libavutil         \
++	libcutils         \
+ 	libffmpeg_utils   \
+-	libmediandk       \
+-	liblog
++	liblog            \
++	libstagefright    \
++	libstagefright_foundation \
++	libutils
+ 
+ LOCAL_MODULE:= libffmpeg_extractor
+ LOCAL_MODULE_RELATIVE_PATH := extractors
+diff --git a/extractor/FFmpegExtractor.cpp b/extractor/FFmpegExtractor.cpp
+index 5b29e48..5538181 100644
+--- a/extractor/FFmpegExtractor.cpp
++++ b/extractor/FFmpegExtractor.cpp
+@@ -39,8 +39,8 @@
+ #include <media/stagefright/MediaErrors.h>
+ #include <media/stagefright/Utils.h>
+ 
+-#include "utils/codec_utils.h"
+-#include "utils/ffmpeg_cmdutils.h"
++#include "codec_utils.h"
++#include "ffmpeg_cmdutils.h"
+ 
+ #include "FFmpegExtractor.h"
+ 
+diff --git a/extractor/FFmpegExtractor.h b/extractor/FFmpegExtractor.h
+index a106b36..cc5a889 100644
+--- a/extractor/FFmpegExtractor.h
++++ b/extractor/FFmpegExtractor.h
+@@ -25,7 +25,7 @@
+ #include <utils/threads.h>
+ #include <utils/KeyedVector.h>
+ 
+-#include "utils/ffmpeg_utils.h"
++#include "ffmpeg_utils.h"
+ 
+ namespace android {
+ 
+diff --git a/include/OMX_FFMPEG_Extn.h b/include/OMX_FFMPEG_Extn.h
+deleted file mode 100644
+index 7382712..0000000
+--- a/include/OMX_FFMPEG_Extn.h
++++ /dev/null
+@@ -1,154 +0,0 @@
+-/*
+- * Copyright (C) 2015 The CyanogenMod Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#ifndef OMX_FFMPEG_Extn_h
+-#define OMX_FFMPEG_Extn_h
+-
+-#ifdef __cplusplus
+-extern "C" {
+-#endif /* __cplusplus */
+-
+-enum OMX_FFMPEG_VIDEO_CODINGTYPE
+-{
+-    OMX_VIDEO_CodingVC1  = 0x7F000001,
+-    OMX_VIDEO_CodingFLV1 = 0x7F000002,
+-    OMX_VIDEO_CodingDIVX = 0x7F000003,
+-};
+-
+-/**
+- * FFMPEG Video Params
+- */
+-typedef struct OMX_VIDEO_PARAM_FFMPEGTYPE {
+-    OMX_U32 nSize;
+-    OMX_VERSIONTYPE nVersion;
+-    OMX_U32 nPortIndex;
+-
+-    OMX_S32 eCodecId;              /**< enum AVCodecID */
+-    OMX_U32 nWidth;
+-    OMX_U32 nHeight;
+-} OMX_VIDEO_PARAM_FFMPEGTYPE;
+-
+-enum OMX_FFMPEG_AUDIO_CODINGTYPE
+-{
+-    OMX_AUDIO_CodingMP2  = 0x7F000001,
+-    OMX_AUDIO_CodingAC3  = 0x7F000002,
+-    OMX_AUDIO_CodingAPE  = 0x7F000003,
+-    OMX_AUDIO_CodingDTS  = 0x7F000004,
+-    OMX_AUDIO_CodingALAC = 0x7F000005,
+-};
+-
+-/** MP2 params */
+-typedef struct OMX_AUDIO_PARAM_MP2TYPE {
+-    OMX_U32 nSize;                 /**< size of the structure in bytes */
+-    OMX_VERSIONTYPE nVersion;      /**< OMX specification version information */
+-    OMX_U32 nPortIndex;            /**< port that this structure applies to */
+-    OMX_U32 nChannels;             /**< Number of channels */
+-    OMX_U32 nBitRate;              /**< Bit rate of the input data.  Use 0 for variable
+-                                        rate or unknown bit rates */
+-    OMX_U32 nSampleRate;           /**< Sampling rate of the source data.  Use 0 for
+-                                        variable or unknown sampling rate. */
+-    OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
+-    OMX_AUDIO_MP3STREAMFORMATTYPE eFormat;  /**< MP3 stream format */
+-} OMX_AUDIO_PARAM_MP2TYPE;
+-
+-/** AC3 params */
+-typedef struct OMX_AUDIO_PARAM_AC3TYPE {
+-    OMX_U32 nSize;                 /**< size of the structure in bytes */
+-    OMX_VERSIONTYPE nVersion;      /**< OMX specification version information */
+-    OMX_U32 nPortIndex;            /**< port that this structure applies to */
+-    OMX_U32 nChannels;             /**< Number of channels */
+-    OMX_U32 nBitRate;              /**< Bit rate of the input data.  Use 0 for variable
+-                                        rate or unknown bit rates */
+-    OMX_U32 nSamplingRate;         /**< Sampling rate of the source data.  Use 0 for
+-                                        variable or unknown sampling rate. */
+-    OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
+-} OMX_AUDIO_PARAM_AC3TYPE;
+-
+-/** APE params */
+-typedef struct OMX_AUDIO_PARAM_APETYPE {
+-    OMX_U32 nSize;                /**< size of the structure in bytes */
+-    OMX_VERSIONTYPE nVersion;     /**< OMX specification version information */
+-    OMX_U32 nPortIndex;           /**< port that this structure applies to */
+-    OMX_U32 nChannels;            /**< Number of channels */
+-    OMX_U32 nBitRate;             /**< Bit rate of the input data.  Use 0 for variable
+-                                       rate or unknown bit rates */
+-    OMX_U32 nSamplingRate;        /**< Sampling rate of the source data.  Use 0 for
+-                                       variable or unknown sampling rate. */
+-    OMX_U32 nBitsPerSample;       /**< Number of bits in each sample */
+-    OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
+-} OMX_AUDIO_PARAM_APETYPE;
+-
+-/** ALAC params */
+-typedef struct OMX_AUDIO_PARAM_ALACTYPE {
+-    OMX_U32 nSize;                /**< size of the structure in bytes */
+-    OMX_VERSIONTYPE nVersion;     /**< OMX specification version information */
+-    OMX_U32 nPortIndex;           /**< port that this structure applies to */
+-    OMX_U32 nChannels;            /**< Number of channels */
+-    OMX_U32 nBitRate;             /**< Bit rate of the input data.  Use 0 for variable
+-                                       rate or unknown bit rates */
+-    OMX_U32 nSamplingRate;        /**< Sampling rate of the source data.  Use 0 for
+-                                       variable or unknown sampling rate. */
+-    OMX_U32 nBitsPerSample;       /**< Number of bits in each sample */
+-    OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
+-} OMX_AUDIO_PARAM_ALACTYPE;
+-
+-/** DTS params */
+-typedef struct OMX_AUDIO_PARAM_DTSTYPE {
+-    OMX_U32 nSize;                 /**< size of the structure in bytes */
+-    OMX_VERSIONTYPE nVersion;      /**< OMX specification version information */
+-    OMX_U32 nPortIndex;            /**< port that this structure applies to */
+-    OMX_U32 nChannels;             /**< Number of channels */
+-    OMX_U32 nBitRate;              /**< Bit rate of the input data.  Use 0 for variable
+-                                        rate or unknown bit rates */
+-    OMX_U32 nSamplingRate;         /**< Sampling rate of the source data.  Use 0 for
+-                                        variable or unknown sampling rate. */
+-    OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
+-} OMX_AUDIO_PARAM_DTSTYPE;
+-
+-/** FFMPEG Audio params */
+-typedef struct OMX_AUDIO_PARAM_FFMPEGTYPE {
+-    OMX_U32 nSize;
+-    OMX_VERSIONTYPE nVersion;
+-    OMX_U32 nPortIndex;
+-
+-    OMX_S32 eCodecId;              /**< enum AVCodecID */
+-    OMX_U32 nChannels;             /**< Number of channels */
+-    OMX_U32 nBitRate;              /**< Bit rate of the input data.  Use 0 for variable
+-                                        rate or unknown bit rates */
+-    OMX_U32 nBitsPerSample;        /**< Number of bits in each sample */
+-    OMX_U32 nSampleRate;           /**< Sampling rate of the source data.  Use 0 for
+-                                        variable or unknown sampling rate. */
+-    OMX_U32 nBlockAlign;           /**< is the block alignment, or block size, in bytes of the audio codec */
+-
+-    OMX_S32 eSampleFormat;         /**< enum AVSampleFormat */
+-} OMX_AUDIO_PARAM_FFMPEGTYPE;
+-
+-enum OMX_FFMPEG_INDEXTYPE
+-{
+-    OMX_IndexParamAudioMp2     = 0x7FB0001,  /**< reference: OMX_AUDIO_PARAM_MP2TYPE */
+-    OMX_IndexParamAudioAc3     = 0x7FB0002,  /**< reference: OMX_AUDIO_PARAM_AC3TYPE */
+-    OMX_IndexParamAudioApe     = 0x7FB0003,  /**< reference: OMX_AUDIO_PARAM_APETYPE */
+-    OMX_IndexParamAudioDts     = 0x7FB0004,  /**< reference: OMX_AUDIO_PARAM_DTSTYPE */
+-    OMX_IndexParamVideoFFmpeg  = 0x7FB0005,  /**< reference: OMX_VIDEO_PARAM_FFMPEGTYPE */
+-    OMX_IndexParamAudioFFmpeg  = 0x7FB0006,  /**< reference: OMX_AUDIO_PARAM_FFMPEGTYPE */
+-    OMX_IndexParamAudioAlac    = 0x7FB0007,  /**< reference: OMX_AUDIO_PARAM_ALACTYPE */
+-};
+-
+-#ifdef __cplusplus
+-};
+-#endif /* __cplusplus */
+-
+-#endif
+diff --git a/omx/Android.mk b/omx/Android.mk
+index 08cf15e..ead5d40 100644
+--- a/omx/Android.mk
++++ b/omx/Android.mk
+@@ -5,21 +5,20 @@ include $(SF_COMMON_MK)
+ LOCAL_SRC_FILES := \
+ 	FFmpegOMXPlugin.cpp \
+ 	SoftFFmpegAudio.cpp \
+-	SoftFFmpegVideo.cpp \
+-	ffmpeg_hwaccel.c \
+-
+-LOCAL_C_INCLUDES += \
+-	$(TOP)/frameworks/native/include/media/hardware
++	SoftFFmpegVideo.cpp
+ 
+ LOCAL_SHARED_LIBRARIES += \
+-	libdl             \
++	libavcodec        \
++	libavutil         \
++	libcutils         \
+ 	libffmpeg_utils   \
+-	android.hidl.memory@1.0	\
+ 	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
+ 	liblog            \
+-	libnativewindow   \
+ 	libswscale        \
+-	libstagefright_softomx
++	libstagefright    \
++	libstagefright_foundation \
++	libstagefright_softomx \
++	libutils
+ 
+ LOCAL_MODULE:= libffmpeg_omx
+ 
+diff --git a/include/FFmpegComponents.h b/omx/FFmpegComponents.h
+similarity index 98%
+rename from include/FFmpegComponents.h
+rename to omx/FFmpegComponents.h
+index c737ebb..2ab7f24 100644
+--- a/include/FFmpegComponents.h
++++ b/omx/FFmpegComponents.h
+@@ -21,12 +21,12 @@
+ #include <OMX_AudioExt.h>
+ #include <OMX_IndexExt.h>
+ 
++#include <media/stagefright/FFMPEGOmxExtn.h>
++
+ #include "config.h"
+ #include "libavformat/avformat.h"
+ #include "libavcodec/avcodec.h"
+ 
+-#include <OMX_FFMPEG_Extn.h>
+-
+ namespace android {
+ 
+ static const struct AudioCodingMapEntry {
+diff --git a/omx/FFmpegOMXPlugin.h b/omx/FFmpegOMXPlugin.h
+index 71cb400..d21172d 100644
+--- a/omx/FFmpegOMXPlugin.h
++++ b/omx/FFmpegOMXPlugin.h
+@@ -18,18 +18,15 @@
+ 
+ #define FFMPEG_OMX_PLUGIN_H_
+ 
++#include <media/hardware/OMXPluginBase.h>
+ #include <media/stagefright/foundation/ABase.h>
+-#include <OMXPluginBase.h>
+ 
+-#include <OMX_AudioExt.h>
+-#include <OMX_IndexExt.h>
++#include <OMX_Core.h>
+ 
+ #include "config.h"
+ #include "libavformat/avformat.h"
+ #include "libavcodec/avcodec.h"
+ 
+-#include <OMX_FFMPEG_Extn.h>
+-
+ namespace android {
+ 
+ struct FFmpegOMXPlugin : public OMXPluginBase {
+diff --git a/omx/SoftFFmpegAudio.h b/omx/SoftFFmpegAudio.h
+index d2c4354..2cc01db 100644
+--- a/omx/SoftFFmpegAudio.h
++++ b/omx/SoftFFmpegAudio.h
+@@ -26,7 +26,7 @@
+ #error "__GNUC__ cflags should be enabled"
+ #endif
+ 
+-#include "utils/ffmpeg_utils.h"
++#include "ffmpeg_utils.h"
+ 
+ #include <OMX_AudioExt.h>
+ #include <OMX_IndexExt.h>
+diff --git a/omx/SoftFFmpegVideo.h b/omx/SoftFFmpegVideo.h
+index 2bf48f0..e116974 100644
+--- a/omx/SoftFFmpegVideo.h
++++ b/omx/SoftFFmpegVideo.h
+@@ -21,7 +21,7 @@
+ 
+ #include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
+ 
+-#include "utils/ffmpeg_utils.h"
++#include "ffmpeg_utils.h"
+ 
+ namespace android {
+ 
+diff --git a/utils/Android.mk b/utils/Android.mk
+index f370b93..0bec64b 100644
+--- a/utils/Android.mk
++++ b/utils/Android.mk
+@@ -1,4 +1,4 @@
+-LOCAL_PATH:= $(call my-dir)
++LOCAL_PATH := $(call my-dir)
+ 
+ include $(SF_COMMON_MK)
+ 
+@@ -6,16 +6,35 @@ LOCAL_SRC_FILES := \
+ 	ffmpeg_source.cpp \
+ 	ffmpeg_utils.cpp \
+ 	ffmpeg_cmdutils.c \
++	ffmpeg_hwaccel.c \
+ 	codec_utils.cpp
+ 
+ LOCAL_SHARED_LIBRARIES += \
++	libavcodec        \
++	libavformat       \
++	libavutil         \
++	libcutils         \
+ 	liblog            \
+-	libmediandk
++	libstagefright    \
++	libstagefright_foundation \
++	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
++	libswscale        \
++	libutils
+ 
+ LOCAL_STATIC_LIBRARIES += libstagefright_metadatautils
+ 
++LOCAL_HEADER_LIBRARIES += libaudio_system_headers media_ndk_headers
++
+ LOCAL_MODULE := libffmpeg_utils
+ 
++LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
++LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += \
++	libavcodec        \
++	libavformat       \
++	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
++	libswscale
++LOCAL_EXPORT_HEADER_LIBRARY_HEADERS += libaudio_system_headers media_ndk_headers
++
+ # Workaround for inline assembly tricks in FFMPEG which don't play nice with
+ # Clang when included from C++
+ LOCAL_CLANG_CFLAGS += -DAVUTIL_ARM_INTREADWRITE_H
+diff --git a/utils/codec_utils.h b/utils/codec_utils.h
+index 719d691..b0ad213 100644
+--- a/utils/codec_utils.h
++++ b/utils/codec_utils.h
+@@ -22,6 +22,7 @@
+ #include <stdlib.h>
+ 
+ #include <utils/Errors.h>
++#include <media/NdkMediaError.h>
+ #include <media/stagefright/foundation/ABuffer.h>
+ 
+ #include "ffmpeg_utils.h"
+diff --git a/omx/ffmpeg_hwaccel.c b/utils/ffmpeg_hwaccel.c
+similarity index 100%
+rename from omx/ffmpeg_hwaccel.c
+rename to utils/ffmpeg_hwaccel.c
+diff --git a/omx/ffmpeg_hwaccel.h b/utils/ffmpeg_hwaccel.h
+similarity index 100%
+rename from omx/ffmpeg_hwaccel.h
+rename to utils/ffmpeg_hwaccel.h
+diff --git a/utils/ffmpeg_utils.h b/utils/ffmpeg_utils.h
+index 0462856..1b931b7 100644
+--- a/utils/ffmpeg_utils.h
++++ b/utils/ffmpeg_utils.h
+@@ -31,23 +31,7 @@ extern "C" {
+ #include "config.h"
+ #include "libavformat/avformat.h"
+ #include "libavcodec/avcodec.h"
+-
+-#include "libavutil/avstring.h"
+-#include "libavutil/colorspace.h"
+-#include "libavutil/mathematics.h"
+-#include "libavutil/pixdesc.h"
+-#include "libavutil/imgutils.h"
+-#include "libavutil/dict.h"
+-#include "libavutil/parseutils.h"
+-#include "libavutil/samplefmt.h"
+-#include "libavutil/avassert.h"
+-#include "libavformat/avformat.h"
+-#include "libavdevice/avdevice.h"
+ #include "libswscale/swscale.h"
+-#include "libavutil/opt.h"
+-#include "libavutil/internal.h"
+-#include "libavcodec/avfft.h"
+-#include "libavcodec/xiph.h"
+ #ifdef LIBAV_CONFIG_H
+ #include "libavresample/avresample.h"
+ #else

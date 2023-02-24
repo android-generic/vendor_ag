@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Mon, 3 Oct 2022 14:39:13 +0200
+Subject: [PATCH 2/9] Fix compilation with AOSP clang
+
+---
+ android/build.mk | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/android/build.mk b/android/build.mk
+index ba9d453903..b544db2467 100644
+--- a/android/build.mk
++++ b/android/build.mk
+@@ -67,6 +67,12 @@ LOCAL_CFLAGS += \
+ 	-Wno-parentheses -Wno-switch -Wno-format-zero-length -Wno-pointer-sign \
+ 	-Wno-unused-const-variable -Wno-bool-operation -Wno-deprecated-declarations \
+ 	-Wno-unused-variable
++# Additional flags required for AOSP/clang
++LOCAL_CFLAGS += \
++	-Wno-unused-parameter -Wno-missing-field-initializers \
++	-Wno-incompatible-pointer-types-discards-qualifiers -Wno-sometimes-uninitialized \
++	-Wno-unneeded-internal-declaration -Wno-initializer-overrides -Wno-string-plus-int \
++	-Wno-absolute-value -Wno-constant-conversion
+ 
+ LOCAL_ASFLAGS_x86 := -Pconfig-x86.asm
+ LOCAL_ASFLAGS_x86_64 := -Pconfig-x86_64.asm

@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Mon, 9 Jan 2023 18:37:48 +0100
+Subject: [PATCH 13/13] Don't disable OMX video codecs when media.sf.hwaccel=0
+
+The property media.sf.hwaccel should only affect whether VA-API is used,
+but not whether OMX codecs are available.
+---
+ omx/SoftFFmpegVideo.cpp | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/omx/SoftFFmpegVideo.cpp b/omx/SoftFFmpegVideo.cpp
+index d23a227..50ab295 100644
+--- a/omx/SoftFFmpegVideo.cpp
++++ b/omx/SoftFFmpegVideo.cpp
+@@ -830,9 +830,6 @@ SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
+         const char *name, const OMX_CALLBACKTYPE *callbacks,
+         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
+ 
+-    if (!property_get_bool("media.sf.hwaccel", 1))
+-        return NULL;
+-
+     OMX_VIDEO_CODINGTYPE codingType = OMX_VIDEO_CodingAutoDetect;
+     const char *componentRole = NULL;
+     enum AVCodecID codecID = AV_CODEC_ID_NONE;

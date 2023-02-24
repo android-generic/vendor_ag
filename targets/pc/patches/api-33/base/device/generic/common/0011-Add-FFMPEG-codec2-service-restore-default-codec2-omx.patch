@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Fri, 14 Oct 2022 15:17:43 +0200
+Subject: [PATCH 11/11] Add FFMPEG codec2 service + restore default codec2/omx
+ priorities
+
+---
+ device.mk        | 3 ---
+ media_codecs.xml | 1 +
+ packages.mk      | 3 ++-
+ 3 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/device.mk b/device.mk
+index 94243fb..2acb102 100644
+--- a/device.mk
++++ b/device.mk
+@@ -24,9 +24,6 @@ PRODUCT_PROPERTY_OVERRIDES := \
+     media.sf.hwaccel=1 \
+     media.sf.omx-plugin=libffmpeg_omx.so \
+     media.sf.extractor-plugin=libffmpeg_extractor.so \
+-    debug.stagefright.ccodec=0 \
+-    debug.stagefright.omx_default_rank.sw-audio=1 \
+-    debug.stagefright.omx_default_rank=0 \
+     ro.lmk.kill_timeout_ms=100 \
+     ro.arch=x86 \
+     persist.rtc_local_time=1
+diff --git a/media_codecs.xml b/media_codecs.xml
+index c300963..818ac4c 100644
+--- a/media_codecs.xml
++++ b/media_codecs.xml
+@@ -80,6 +80,7 @@ Only the three quirks included above are recognized at this point:
+ <MediaCodecs>
+     <Include href="media_codecs_c2.xml" />
+     <Include href="media_codecs_ffmpeg.xml" />
++    <Include href="media_codecs_ffmpeg_c2.xml" />
+     <Include href="media_codecs_google_audio.xml" />
+     <Include href="media_codecs_google_video.xml" />
+ </MediaCodecs>
+diff --git a/packages.mk b/packages.mk
+index 915a885..05b5fb0 100644
+--- a/packages.mk
++++ b/packages.mk
+@@ -93,7 +93,8 @@ PRODUCT_PACKAGES += \
+     i965_drv_video \
+     libffmpeg_extractor \
+     libffmpeg_omx \
+-    media_codecs_ffmpeg.xml
++    media_codecs_ffmpeg.xml \
++    android.hardware.media.c2@1.2-ffmpeg-service
+ 
+ # Third party apps
+ PRODUCT_PACKAGES += \

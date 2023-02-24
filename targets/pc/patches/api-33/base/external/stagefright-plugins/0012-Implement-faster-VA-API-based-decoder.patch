@@ -1,0 +1,266 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Wed, 12 Oct 2022 15:30:21 +0200
+Subject: [PATCH 12/13] Implement faster VA-API based decoder
+
+The main bottleneck of the VA-API decoder is the transfer of the HW
+frame into system memory. This change implements a better method to
+perform this transfer.
+
+1. Map frame to YV12
+
+This maps the HW frame to memory, using linear YV12 format. Because the
+Intel GPU buffer is Y-tiled NV12 internally, this requires untiling and
+converting the data, which slows down the process.
+
+2. Download frame as YV12
+
+This is the same as 1, but also copy the mapped buffer into FFMPEG
+internal buffer. This additional copy introduces further latency.
+---
+ codec2/C2FFMPEGAudioDecodeComponent.cpp |  6 ++--
+ codec2/C2FFMPEGVideoDecodeComponent.cpp | 16 ++++++---
+ codec2/C2FFMPEGVideoDecodeInterface.cpp |  8 +++++
+ codec2/C2FFMPEGVideoDecodeInterface.h   |  2 ++
+ codec2/service.cpp                      | 44 +++++++++++++++----------
+ utils/ffmpeg_hwaccel.c                  | 28 ++++++++++++++++
+ utils/ffmpeg_utils.h                    |  1 +
+ 7 files changed, 79 insertions(+), 26 deletions(-)
+
+diff --git a/codec2/C2FFMPEGAudioDecodeComponent.cpp b/codec2/C2FFMPEGAudioDecodeComponent.cpp
+index 62b52b1..01a12ca 100644
+--- a/codec2/C2FFMPEGAudioDecodeComponent.cpp
++++ b/codec2/C2FFMPEGAudioDecodeComponent.cpp
+@@ -586,7 +586,7 @@ void C2FFMPEGAudioDecodeComponent::process(
+ #if DEBUG_FRAMES
+             ALOGD("process: got frame pts=%" PRId64 " dts=%" PRId64 " ts=%" PRId64 " - sr=%d, ch=%d, fmt=%s, #=%d",
+                   mFrame->pts, mFrame->pkt_dts, mFrame->best_effort_timestamp,
+-                  mFrame->sample_rate, mFrame->channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
++                  mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
+                   mFrame->nb_samples);
+ #endif
+             // Always target the sample format on output port. Even if we can trigger a config update
+@@ -670,7 +670,7 @@ void C2FFMPEGAudioDecodeComponent::process(
+                     clone->worklets.front()->output.buffers.clear();
+                     clone->worklets.front()->output.buffers.push_back(buffer);
+                     clone->worklets.front()->output.ordinal = clone->input.ordinal;
+-                    if (mFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
++                    if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
+                         work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
+                     }
+                     clone->worklets.front()->output.flags = C2FrameData::FLAG_INCOMPLETE;
+@@ -686,7 +686,7 @@ void C2FFMPEGAudioDecodeComponent::process(
+             }
+             else {
+                 work->worklets.front()->output.buffers.push_back(buffer);
+-                if (mFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
++                if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
+                     work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
+                 }
+                 break;
+diff --git a/codec2/C2FFMPEGVideoDecodeComponent.cpp b/codec2/C2FFMPEGVideoDecodeComponent.cpp
+index 12c90e1..41d18fc 100644
+--- a/codec2/C2FFMPEGVideoDecodeComponent.cpp
++++ b/codec2/C2FFMPEGVideoDecodeComponent.cpp
+@@ -263,6 +263,7 @@ c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuff
+     uint8_t* data[4];
+     int linesize[4];
+     C2PlanarLayout layout = outBuffer->layout();
++    struct SwsContext* currentImgConvertCtx = mImgConvertCtx;
+ 
+     data[0] = outBuffer->data()[C2PlanarLayout::PLANE_Y];
+     data[1] = outBuffer->data()[C2PlanarLayout::PLANE_U];
+@@ -271,16 +272,21 @@ c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuff
+     linesize[1] = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+     linesize[2] = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+ 
+-    mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
++    mImgConvertCtx = sws_getCachedContext(currentImgConvertCtx,
+            mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format,
+            mFrame->width, mFrame->height, AV_PIX_FMT_YUV420P,
+            SWS_BICUBIC, NULL, NULL, NULL);
+-    if (! mImgConvertCtx) {
++    if (mImgConvertCtx && mImgConvertCtx != currentImgConvertCtx) {
++        ALOGD("getOutputBuffer: created video converter - %s => %s",
++              av_get_pix_fmt_name((AVPixelFormat)mFrame->format), av_get_pix_fmt_name(AV_PIX_FMT_YUV420P));
++
++    } else if (! mImgConvertCtx) {
+         ALOGE("getOutputBuffer: cannot initialize the conversion context");
+         return C2_NO_MEMORY;
+     }
++
+     sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
+-            0, mFrame->height, data, linesize);
++              0, mFrame->height, data, linesize);
+ 
+     return C2_OK;
+ }
+@@ -464,8 +470,8 @@ c2_status_t C2FFMPEGVideoDecodeComponent::outputFrame(
+                                   { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
+ 
+     if (err != C2_OK) {
+-        ALOGE("outputFrame: failed to fetch graphic block %d x %x (%x) err = %d",
+-              mFrame->width, mFrame->height, format, err);
++        ALOGE("outputFrame: failed to fetch graphic block %d x %d (%x) err = %d",
++              mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12, err);
+         return C2_CORRUPTED;
+     }
+ 
+diff --git a/codec2/C2FFMPEGVideoDecodeInterface.cpp b/codec2/C2FFMPEGVideoDecodeInterface.cpp
+index e3368f2..6e130f8 100644
+--- a/codec2/C2FFMPEGVideoDecodeInterface.cpp
++++ b/codec2/C2FFMPEGVideoDecodeInterface.cpp
+@@ -212,6 +212,14 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
+             .withFields({C2F(mRawCodecData, m.value)})
+             .withSetter(CodecSetter)
+             .build());
++
++    addParameter(
++            DefineParam(mConsumerUsage, C2_PARAMKEY_OUTPUT_STREAM_USAGE)
++            .withDefault(new C2StreamUsageTuning::output(
++                                0u, GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER))
++            .withFields({C2F(mConsumerUsage, value).any()})
++            .withSetter(Setter<decltype(*mConsumerUsage)>::StrictValueWithNoDeps)
++            .build());
+ }
+ 
+ C2R C2FFMPEGVideoDecodeInterface::SizeSetter(
+diff --git a/codec2/C2FFMPEGVideoDecodeInterface.h b/codec2/C2FFMPEGVideoDecodeInterface.h
+index 8654c05..39ab393 100644
+--- a/codec2/C2FFMPEGVideoDecodeInterface.h
++++ b/codec2/C2FFMPEGVideoDecodeInterface.h
+@@ -32,6 +32,7 @@ public:
+     uint32_t getWidth() const { return mSize->width; }
+     uint32_t getHeight() const { return mSize->height; }
+     const FFMPEGVideoCodecInfo* getCodecInfo() const;
++    uint64_t getConsumerUsage() const { return mConsumerUsage->value; }
+     const std::shared_ptr<C2StreamPixelFormatInfo::output>&
+         getPixelFormatInfo() const { return mPixelFormat; }
+     uint32_t getOutputDelay() const { return mActualOutputDelay->value; }
+@@ -54,6 +55,7 @@ private:
+     std::shared_ptr<C2StreamColorInfo::output> mColorInfo;
+     std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
+     std::shared_ptr<C2StreamRawCodecDataInfo::input> mRawCodecData;
++    std::shared_ptr<C2StreamUsageTuning::output> mConsumerUsage;
+ };
+ 
+ } // namespace android
+diff --git a/codec2/service.cpp b/codec2/service.cpp
+index 8391b92..6c52415 100644
+--- a/codec2/service.cpp
++++ b/codec2/service.cpp
+@@ -155,29 +155,37 @@ public:
+ 
+     virtual std::vector<std::shared_ptr<const C2Component::Traits>>
+             listComponents() override {
+-        ALOGD("listComponents");
+         std::vector<std::shared_ptr<const C2Component::Traits>> ret;
+         // FIXME: Prefer OMX codecs for the time being...
+         uint32_t defaultRank = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank", 0x110u);
+         uint32_t defaultRankAudio = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.audio", defaultRank);
+         uint32_t defaultRankVideo = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.video", defaultRank);
+-        for (int i = 0; i < kNumAudioComponents; i++) {
+-            auto traits = std::make_shared<C2Component::Traits>();
+-            traits->name = kFFMPEGAudioComponents[i].name;
+-            traits->domain = C2Component::DOMAIN_AUDIO;
+-            traits->kind = C2Component::KIND_DECODER;
+-            traits->mediaType = kFFMPEGAudioComponents[i].mediaType;
+-            traits->rank = defaultRankAudio;
+-            ret.push_back(traits);
+-        }
+-        for (int i = 0; i < kNumVideoComponents; i++) {
+-            auto traits = std::make_shared<C2Component::Traits>();
+-            traits->name = kFFMPEGVideoComponents[i].name;
+-            traits->domain = C2Component::DOMAIN_VIDEO;
+-            traits->kind = C2Component::KIND_DECODER;
+-            traits->mediaType = kFFMPEGVideoComponents[i].mediaType;
+-            traits->rank = defaultRankVideo;
+-            ret.push_back(traits);
++        ALOGD("listComponents: defaultRank=%x, defaultRankAudio=%x, defaultRankVideo=%x",
++              defaultRank, defaultRankAudio, defaultRankVideo);
++#define RANK_DISABLED 0xFFFFFFFF
++        if (defaultRank != RANK_DISABLED) {
++            if (defaultRankAudio != RANK_DISABLED) {
++                for (int i = 0; i < kNumAudioComponents; i++) {
++                    auto traits = std::make_shared<C2Component::Traits>();
++                    traits->name = kFFMPEGAudioComponents[i].name;
++                    traits->domain = C2Component::DOMAIN_AUDIO;
++                    traits->kind = C2Component::KIND_DECODER;
++                    traits->mediaType = kFFMPEGAudioComponents[i].mediaType;
++                    traits->rank = defaultRankAudio;
++                    ret.push_back(traits);
++                }
++            }
++            if (defaultRankVideo != RANK_DISABLED) {
++                for (int i = 0; i < kNumVideoComponents; i++) {
++                    auto traits = std::make_shared<C2Component::Traits>();
++                    traits->name = kFFMPEGVideoComponents[i].name;
++                    traits->domain = C2Component::DOMAIN_VIDEO;
++                    traits->kind = C2Component::KIND_DECODER;
++                    traits->mediaType = kFFMPEGVideoComponents[i].mediaType;
++                    traits->rank = defaultRankVideo;
++                    ret.push_back(traits);
++                }
++            }
+         }
+         return ret;
+     }
+diff --git a/utils/ffmpeg_hwaccel.c b/utils/ffmpeg_hwaccel.c
+index af9f18d..60117d1 100644
+--- a/utils/ffmpeg_hwaccel.c
++++ b/utils/ffmpeg_hwaccel.c
+@@ -70,6 +70,32 @@ int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
+         return AVERROR(ENOMEM);
+     }
+ 
++    // The frame transfer from GPU uses 2 different methods:
++    // 1. Map hw-frame to YV12
++    //    This method maps the GPU buffer into a linear buffer in system
++    //    memory. Because the Intel GPU uses Y-tiled for decoding, this
++    //    requires internal conversion (detiling), which slows down the
++    //    process. However the mapped system memory is not copied, which
++    //    makes it faster than next method.
++    // 2. Transfer hw-frame to YV12
++    //    This method does the same as the previous one, but also copy the
++    //    mapped memory into FFMPEG-owned buffers. This additional copy makes
++    //    it the slowest. This would typically not be used, as method 2
++    //    would be successful (and if it fails, then method 3 will also
++    //    likely fail).
++
++    // YUV420P mapping (slower)
++
++    output->format = AV_PIX_FMT_YUV420P;
++
++    err = av_hwframe_map(output, frame, AV_HWFRAME_MAP_READ);
++    if (err == 0) {
++        goto finish;
++    }
++    av_frame_unref(output);
++
++    // HW frame download (slowest)
++
+     output->format = AV_PIX_FMT_YUV420P;
+ 
+     err = av_hwframe_transfer_data(output, frame, 0);
+@@ -78,7 +104,9 @@ int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
+               av_err2str(err), err);
+         goto fail;
+     }
++    goto finish;
+ 
++finish:
+     err = av_frame_copy_props(output, frame);
+     if (err < 0) {
+         ALOGE("ffmpeg_hwaccel_get_frame failed to copy frame properties: %s (%08x)",
+diff --git a/utils/ffmpeg_utils.h b/utils/ffmpeg_utils.h
+index 4c15b49..d297314 100644
+--- a/utils/ffmpeg_utils.h
++++ b/utils/ffmpeg_utils.h
+@@ -39,6 +39,7 @@ extern "C" {
+ #include "libswresample/swresample.h"
+ #endif
+ #include "libavutil/opt.h"
++#include "libavutil/pixdesc.h"
+ 
+ #include <system/audio.h>
+ 

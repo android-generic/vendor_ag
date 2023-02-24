@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@lincor.com>
+Date: Thu, 3 Jun 2021 19:04:42 -0400
+Subject: [PATCH 10/13] Disable use of AV_CODEC_FLAG2_FAST
+
+This flag can create decoding artefacts in some test streams. Leave the
+option to re-enable it through bool property "debug.ffmpeg.fast".
+---
+ omx/SoftFFmpegVideo.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/omx/SoftFFmpegVideo.cpp b/omx/SoftFFmpegVideo.cpp
+index a465375..d23a227 100644
+--- a/omx/SoftFFmpegVideo.cpp
++++ b/omx/SoftFFmpegVideo.cpp
+@@ -105,7 +105,7 @@ SoftFFmpegVideo::~SoftFFmpegVideo() {
+ }
+ 
+ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec __unused) {
+-    int fast = 1;
++    int fast = property_get_bool("debug.ffmpeg.fast", 0);
+ 
+     avctx->workaround_bugs   = 1;
+     avctx->idct_algo         = 0;

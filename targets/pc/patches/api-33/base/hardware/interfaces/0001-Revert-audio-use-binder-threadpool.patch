@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Sun, 11 Sep 2022 14:39:06 +0200
+Subject: [PATCH] Revert "audio: use binder threadpool"
+
+This reverts commit d90c47420af3aa59c6fc864c30023ec62b0a26ac.
+
+This fixes crash in audio service, due to trying to change the thread
+count after the pool has started.
+
+https: //android-review.googlesource.com/c/platform/hardware/interfaces/+/1986309
+https: //android-review.googlesource.com/c/platform/hardware/interfaces/+/2201827
+Change-Id: I7807cff494582833243dde557ed9cb1821f4c6db
+---
+ audio/common/all-versions/default/service/service.cpp | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/audio/common/all-versions/default/service/service.cpp b/audio/common/all-versions/default/service/service.cpp
+index fbf616563..f7c06835a 100644
+--- a/audio/common/all-versions/default/service/service.cpp
++++ b/audio/common/all-versions/default/service/service.cpp
+@@ -20,7 +20,7 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <android/binder_process.h>
++#include <android/binder_status.h>
+ #include <binder/ProcessState.h>
+ #include <cutils/properties.h>
+ #include <dlfcn.h>
+@@ -79,9 +79,6 @@ int main(int /* argc */, char* /* argv */ []) {
+     // start a threadpool for vndbinder interactions
+     ::android::ProcessState::self()->startThreadPool();
+ 
+-    ABinderProcess_setThreadPoolMaxThreadCount(1);
+-    ABinderProcess_startThreadPool();
+-
+     const int32_t defaultValue = -1;
+     int32_t value =
+         property_get_int32("persist.vendor.audio.service.hwbinder.size_kbyte", defaultValue);

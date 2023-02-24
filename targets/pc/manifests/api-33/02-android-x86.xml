@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+
+  <project path="kernel" name="kernel/common" remote="aosp" revision="c73b4619ad86a2a29fc998e950e98bcdfa2f6d8f" />
+  <project path="test/kernel" name="kernel/tests" remote="aosp" />
+  <project path="bootable/newinstaller" name="platform/bootable/newinstaller" remote="x86" revision="r-x86" />
+  <project path="device/generic/common" name="device/generic/common" remote="x86" revision="r-x86" />
+  <project path="device/generic/firmware" name="device/generic/firmware" remote="x86" revision="r-x86" />
+  <project path="device/generic/x86_64" name="device/generic/x86_64" remote="x86" revision="r-x86" />
+  <project path="device/generic/x86" name="device/generic/x86" remote="x86" revision="r-x86" />
+  <project path="external/alsa-lib" name="platform/external/alsa-lib" remote="x86" revision="r-x86" />
+  <project path="external/alsa-utils" name="platform/external/alsa-utils" remote="x86" revision="r-x86" />
+  <project path="external/busybox" name="platform/external/busybox" remote="x86" revision="r-x86" groups="notdefault" />
+  <!-- <project path="external/drm_hwcomposer" name="glodroid_forks.git" remote="glodroid" revision="refs/tags/drm_hwcomposer-v0.8.0" /> -->
+  <project path="external/drm_hwcomposer" name="drm_hwcomposer" remote="blissroms-x86" revision="drm_hwcomposer-v0.8.0" />
+  <project path="external/efibootmgr" name="platform/external/efibootmgr" remote="x86" revision="r-x86" />
+  <project path="external/efivar" name="platform/external/efivar" remote="x86" revision="r-x86" />
+  <project path="external/ffmpeg" name="ffmpeg.git" remote="ffmpeg" revision="refs/tags/n5.1.2" />
+  <project path="external/mesa3d" name="mesa/mesa.git" remote="freedesktop" revision="32552010d1e0243948aebd6b6642ba9aeb979004" />
+  <!-- <project path="external/minigbm" name="glodroid_forks.git" remote="glodroid" revision="refs/tags/minigbm-v0.8.1" /> -->
+  <project path="external/minigbm" name="minigbm" remote="blissroms-x86" revision="minigbm-v0.8.1" />
+  <project path="external/ntfs-3g" name="platform/external/ntfs-3g" remote="x86" revision="r-x86" />
+  <project path="external/stagefright-plugins" name="platform/external/stagefright-plugins" remote="x86" revision="r-x86" />
+  <project path="external/syslinux" name="platform/external/syslinux" remote="aosp" revision="master" />
+  <project path="external/v86d" name="platform/external/v86d" remote="x86" revision="r-x86" />
+  <project path="hardware/gps" name="platform/hardware/gps" remote="x86" revision="r-x86" />
+  <project path="hardware/intel/audio_media" name="platform/hardware/intel/audio_media" remote="x86" revision="r-x86" />
+  <project path="hardware/intel/common/libva" name="platform/hardware/intel/common/libva" remote="x86" revision="r-x86" />
+  <project path="hardware/intel/common/vaapi" name="platform/hardware/intel/common/vaapi" remote="x86" revision="r-x86" />
+  <project path="hardware/intel/libsensors" name="platform/hardware/intel/libsensors" remote="x86" revision="r-x86" />
+  <project path="hardware/libaudio" name="platform/hardware/libaudio" remote="x86" revision="r-x86" />
+  <project path="hardware/libcamera" name="platform/hardware/libcamera" remote="x86" revision="r-x86" />
+  <project path="hardware/liblights" name="platform/hardware/liblights" remote="x86" revision="r-x86" />
+  <project path="hardware/libsensors" name="platform/hardware/libsensors" remote="x86" revision="r-x86" />
+  <project path="hardware/memtrack" name="platform/hardware/memtrack" remote="x86" revision="r-x86" />
+  <project path="hardware/x86power" name="platform/hardware/x86power" remote="x86" revision="r-x86" />
+  <project path="packages/apps/TSCalibration2" name="platform/packages/apps/TSCalibration2" remote="x86" revision="r-x86" />
+  <project path="vendor/google/chromeos-x86" name="android_vendor_google_chromeos-x86.git" remote="blissroms-x86" revision="13816.82.0_hatch" />
+  <project path="vendor/google/emu-x86" name="android_vendor_google_emu-x86.git" remote="android-generic" revision="cce00e675942376cc78a99f64cc48205d1145dd4" />
+
+</manifest>

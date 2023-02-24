@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chih-Wei Huang <cwhuang@linux.org.tw>
+Date: Sun, 18 May 2014 02:20:32 +0800
+Subject: [PATCH 05/20] InputReader: read the pointercal from TSCalibration2
+
+Watch the pointercal and reload it on changed.
+---
+ .../android/server/input/InputManagerService.java | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/services/core/java/com/android/server/input/InputManagerService.java b/services/core/java/com/android/server/input/InputManagerService.java
+index 72612a0468cd..abf1e27fcbd0 100644
+--- a/services/core/java/com/android/server/input/InputManagerService.java
++++ b/services/core/java/com/android/server/input/InputManagerService.java
+@@ -65,6 +65,7 @@ import android.os.Binder;
+ import android.os.Bundle;
+ import android.os.CombinedVibration;
+ import android.os.Environment;
++import android.os.FileObserver;
+ import android.os.Handler;
+ import android.os.IBinder;
+ import android.os.IInputConstants;
+@@ -412,6 +413,19 @@ public class InputManagerService extends IInputManager.Stub
+         }
+     }
+ 
++    private class TscalObserver extends FileObserver {
++        public TscalObserver() {
++            super("/data/misc/tscal/pointercal", CLOSE_WRITE);
++        }
++
++        @Override
++        public void onEvent(int event, String path) {
++            Slog.i(TAG, "detect pointercal changed");
++            reloadDeviceAliases();
++        }
++    }
++    private final TscalObserver mTscalObserver = new TscalObserver();
++
+     public InputManagerService(Context context) {
+         this(new Injector(context, DisplayThread.get().getLooper()));
+     }
+@@ -437,6 +451,7 @@ public class InputManagerService extends IInputManager.Stub
+             new File(doubleTouchGestureEnablePath);
+ 
+         injector.registerLocalService(new LocalService());
++        mTscalObserver.startWatching();
+     }
+ 
+     public void setWindowManagerCallbacks(WindowManagerCallbacks callbacks) {

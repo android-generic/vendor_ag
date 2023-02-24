@@ -1,0 +1,739 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Mon, 3 Oct 2022 14:57:29 +0200
+Subject: [PATCH 3/9] Enable VA-API hwaccel for AOSP
+
+Note: Enabling vaapi_1 is required to avoid memory leaks, as newer
+FFMPEG does not destroy VA buffers, if it thinks it's using an older
+VA-API driver/library.
+---
+ android/config-x86-x86.mak              | 37 +++++++++++++------------
+ android/config-x86_64-x86_64.mak        | 37 +++++++++++++------------
+ android/include/config-x86-x86.h        | 16 +++++++----
+ android/include/config-x86.asm          | 13 +++++----
+ android/include/config-x86_64-x86_64.h  | 16 +++++++----
+ android/include/config-x86_64.asm       | 13 +++++----
+ android/include/config_components.h     | 24 ++++++++--------
+ android/include/libavcodec/codec_list.c |  2 ++
+ configure                               |  6 ++++
+ libavcodec/Android.mk                   |  8 ++++++
+ libavutil/Android.mk                    | 12 ++++++++
+ libavutil/hwcontext_vaapi.c             | 19 +++++++++++++
+ 12 files changed, 131 insertions(+), 72 deletions(-)
+
+diff --git a/android/config-x86-x86.mak b/android/config-x86-x86.mak
+index 5201d5890b..df4b9db69b 100644
+--- a/android/config-x86-x86.mak
++++ b/android/config-x86-x86.mak
+@@ -345,6 +345,7 @@ HAVE_USLEEP=yes
+ !HAVE_VIRTUALALLOC=yes
+ !HAVE_WGLGETPROCADDRESS=yes
+ !HAVE_BCRYPT=yes
++HAVE_VAAPI_ANDROID=yes
+ !HAVE_VAAPI_DRM=yes
+ !HAVE_VAAPI_X11=yes
+ !HAVE_VDPAU_X11=yes
+@@ -445,8 +446,8 @@ CONFIG_RESAMPLING_AUDIO_EXAMPLE=yes
+ CONFIG_SCALING_VIDEO_EXAMPLE=yes
+ CONFIG_TRANSCODE_AAC_EXAMPLE=yes
+ CONFIG_TRANSCODING_EXAMPLE=yes
+-!CONFIG_VAAPI_ENCODE_EXAMPLE=yes
+-!CONFIG_VAAPI_TRANSCODE_EXAMPLE=yes
++CONFIG_VAAPI_ENCODE_EXAMPLE=yes
++CONFIG_VAAPI_TRANSCODE_EXAMPLE=yes
+ !CONFIG_AVISYNTH=yes
+ !CONFIG_FREI0R=yes
+ !CONFIG_LIBCDIO=yes
+@@ -582,7 +583,7 @@ CONFIG_ZLIB=yes
+ !CONFIG_FFNVCODEC=yes
+ !CONFIG_NVDEC=yes
+ !CONFIG_NVENC=yes
+-!CONFIG_VAAPI=yes
++CONFIG_VAAPI=yes
+ !CONFIG_VDPAU=yes
+ !CONFIG_VIDEOTOOLBOX=yes
+ !CONFIG_VULKAN=yes
+@@ -638,7 +639,7 @@ CONFIG_PTX_COMPRESSION=yes
+ CONFIG_BSFS=yes
+ CONFIG_DECODERS=yes
+ CONFIG_ENCODERS=yes
+-!CONFIG_HWACCELS=yes
++CONFIG_HWACCELS=yes
+ CONFIG_PARSERS=yes
+ !CONFIG_INDEVS=yes
+ !CONFIG_OUTDEVS=yes
+@@ -733,8 +734,8 @@ CONFIG_STARTCODE=yes
+ CONFIG_TEXTUREDSP=yes
+ CONFIG_TEXTUREDSPENC=yes
+ CONFIG_TPELDSP=yes
+-!CONFIG_VAAPI_1=yes
+-!CONFIG_VAAPI_ENCODE=yes
++CONFIG_VAAPI_1=yes
++CONFIG_VAAPI_ENCODE=yes
+ CONFIG_VC1DSP=yes
+ CONFIG_VIDEODSP=yes
+ CONFIG_VP3DSP=yes
+@@ -1560,7 +1561,7 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_H264_OMX_ENCODER=yes
+ !CONFIG_H264_QSV_ENCODER=yes
+ !CONFIG_H264_V4L2M2M_ENCODER=yes
+-!CONFIG_H264_VAAPI_ENCODER=yes
++CONFIG_H264_VAAPI_ENCODER=yes
+ !CONFIG_H264_VIDEOTOOLBOX_ENCODER=yes
+ !CONFIG_HEVC_AMF_ENCODER=yes
+ !CONFIG_HEVC_MF_ENCODER=yes
+@@ -1574,7 +1575,7 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_MJPEG_VAAPI_ENCODER=yes
+ !CONFIG_MP3_MF_ENCODER=yes
+ !CONFIG_MPEG2_QSV_ENCODER=yes
+-!CONFIG_MPEG2_VAAPI_ENCODER=yes
++CONFIG_MPEG2_VAAPI_ENCODER=yes
+ !CONFIG_MPEG4_OMX_ENCODER=yes
+ !CONFIG_MPEG4_V4L2M2M_ENCODER=yes
+ !CONFIG_PRORES_VIDEOTOOLBOX_ENCODER=yes
+@@ -1588,24 +1589,24 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_AV1_NVDEC_HWACCEL=yes
+ !CONFIG_AV1_VAAPI_HWACCEL=yes
+ !CONFIG_AV1_VDPAU_HWACCEL=yes
+-!CONFIG_H263_VAAPI_HWACCEL=yes
++CONFIG_H263_VAAPI_HWACCEL=yes
+ !CONFIG_H263_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_H264_D3D11VA_HWACCEL=yes
+ !CONFIG_H264_D3D11VA2_HWACCEL=yes
+ !CONFIG_H264_DXVA2_HWACCEL=yes
+ !CONFIG_H264_NVDEC_HWACCEL=yes
+-!CONFIG_H264_VAAPI_HWACCEL=yes
++CONFIG_H264_VAAPI_HWACCEL=yes
+ !CONFIG_H264_VDPAU_HWACCEL=yes
+ !CONFIG_H264_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_HEVC_D3D11VA_HWACCEL=yes
+ !CONFIG_HEVC_D3D11VA2_HWACCEL=yes
+ !CONFIG_HEVC_DXVA2_HWACCEL=yes
+ !CONFIG_HEVC_NVDEC_HWACCEL=yes
+-!CONFIG_HEVC_VAAPI_HWACCEL=yes
++CONFIG_HEVC_VAAPI_HWACCEL=yes
+ !CONFIG_HEVC_VDPAU_HWACCEL=yes
+ !CONFIG_HEVC_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_MJPEG_NVDEC_HWACCEL=yes
+-!CONFIG_MJPEG_VAAPI_HWACCEL=yes
++CONFIG_MJPEG_VAAPI_HWACCEL=yes
+ !CONFIG_MPEG1_NVDEC_HWACCEL=yes
+ !CONFIG_MPEG1_VDPAU_HWACCEL=yes
+ !CONFIG_MPEG1_VIDEOTOOLBOX_HWACCEL=yes
+@@ -1613,11 +1614,11 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_MPEG2_D3D11VA2_HWACCEL=yes
+ !CONFIG_MPEG2_NVDEC_HWACCEL=yes
+ !CONFIG_MPEG2_DXVA2_HWACCEL=yes
+-!CONFIG_MPEG2_VAAPI_HWACCEL=yes
++CONFIG_MPEG2_VAAPI_HWACCEL=yes
+ !CONFIG_MPEG2_VDPAU_HWACCEL=yes
+ !CONFIG_MPEG2_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_MPEG4_NVDEC_HWACCEL=yes
+-!CONFIG_MPEG4_VAAPI_HWACCEL=yes
++CONFIG_MPEG4_VAAPI_HWACCEL=yes
+ !CONFIG_MPEG4_VDPAU_HWACCEL=yes
+ !CONFIG_MPEG4_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_PRORES_VIDEOTOOLBOX_HWACCEL=yes
+@@ -1625,22 +1626,22 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_VC1_D3D11VA2_HWACCEL=yes
+ !CONFIG_VC1_DXVA2_HWACCEL=yes
+ !CONFIG_VC1_NVDEC_HWACCEL=yes
+-!CONFIG_VC1_VAAPI_HWACCEL=yes
++CONFIG_VC1_VAAPI_HWACCEL=yes
+ !CONFIG_VC1_VDPAU_HWACCEL=yes
+ !CONFIG_VP8_NVDEC_HWACCEL=yes
+-!CONFIG_VP8_VAAPI_HWACCEL=yes
++CONFIG_VP8_VAAPI_HWACCEL=yes
+ !CONFIG_VP9_D3D11VA_HWACCEL=yes
+ !CONFIG_VP9_D3D11VA2_HWACCEL=yes
+ !CONFIG_VP9_DXVA2_HWACCEL=yes
+ !CONFIG_VP9_NVDEC_HWACCEL=yes
+-!CONFIG_VP9_VAAPI_HWACCEL=yes
++CONFIG_VP9_VAAPI_HWACCEL=yes
+ !CONFIG_VP9_VDPAU_HWACCEL=yes
+ !CONFIG_VP9_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_WMV3_D3D11VA_HWACCEL=yes
+ !CONFIG_WMV3_D3D11VA2_HWACCEL=yes
+ !CONFIG_WMV3_DXVA2_HWACCEL=yes
+ !CONFIG_WMV3_NVDEC_HWACCEL=yes
+-!CONFIG_WMV3_VAAPI_HWACCEL=yes
++CONFIG_WMV3_VAAPI_HWACCEL=yes
+ !CONFIG_WMV3_VDPAU_HWACCEL=yes
+ CONFIG_AAC_PARSER=yes
+ CONFIG_AAC_LATM_PARSER=yes
+diff --git a/android/config-x86_64-x86_64.mak b/android/config-x86_64-x86_64.mak
+index 8823eab896..84220f43b8 100644
+--- a/android/config-x86_64-x86_64.mak
++++ b/android/config-x86_64-x86_64.mak
+@@ -345,6 +345,7 @@ HAVE_USLEEP=yes
+ !HAVE_VIRTUALALLOC=yes
+ !HAVE_WGLGETPROCADDRESS=yes
+ !HAVE_BCRYPT=yes
++HAVE_VAAPI_ANDROID=yes
+ !HAVE_VAAPI_DRM=yes
+ !HAVE_VAAPI_X11=yes
+ !HAVE_VDPAU_X11=yes
+@@ -445,8 +446,8 @@ CONFIG_RESAMPLING_AUDIO_EXAMPLE=yes
+ CONFIG_SCALING_VIDEO_EXAMPLE=yes
+ CONFIG_TRANSCODE_AAC_EXAMPLE=yes
+ CONFIG_TRANSCODING_EXAMPLE=yes
+-!CONFIG_VAAPI_ENCODE_EXAMPLE=yes
+-!CONFIG_VAAPI_TRANSCODE_EXAMPLE=yes
++CONFIG_VAAPI_ENCODE_EXAMPLE=yes
++CONFIG_VAAPI_TRANSCODE_EXAMPLE=yes
+ !CONFIG_AVISYNTH=yes
+ !CONFIG_FREI0R=yes
+ !CONFIG_LIBCDIO=yes
+@@ -582,7 +583,7 @@ CONFIG_ZLIB=yes
+ !CONFIG_FFNVCODEC=yes
+ !CONFIG_NVDEC=yes
+ !CONFIG_NVENC=yes
+-!CONFIG_VAAPI=yes
++CONFIG_VAAPI=yes
+ !CONFIG_VDPAU=yes
+ !CONFIG_VIDEOTOOLBOX=yes
+ !CONFIG_VULKAN=yes
+@@ -638,7 +639,7 @@ CONFIG_PTX_COMPRESSION=yes
+ CONFIG_BSFS=yes
+ CONFIG_DECODERS=yes
+ CONFIG_ENCODERS=yes
+-!CONFIG_HWACCELS=yes
++CONFIG_HWACCELS=yes
+ CONFIG_PARSERS=yes
+ !CONFIG_INDEVS=yes
+ !CONFIG_OUTDEVS=yes
+@@ -733,8 +734,8 @@ CONFIG_STARTCODE=yes
+ CONFIG_TEXTUREDSP=yes
+ CONFIG_TEXTUREDSPENC=yes
+ CONFIG_TPELDSP=yes
+-!CONFIG_VAAPI_1=yes
+-!CONFIG_VAAPI_ENCODE=yes
++CONFIG_VAAPI_1=yes
++CONFIG_VAAPI_ENCODE=yes
+ CONFIG_VC1DSP=yes
+ CONFIG_VIDEODSP=yes
+ CONFIG_VP3DSP=yes
+@@ -1560,7 +1561,7 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_H264_OMX_ENCODER=yes
+ !CONFIG_H264_QSV_ENCODER=yes
+ !CONFIG_H264_V4L2M2M_ENCODER=yes
+-!CONFIG_H264_VAAPI_ENCODER=yes
++CONFIG_H264_VAAPI_ENCODER=yes
+ !CONFIG_H264_VIDEOTOOLBOX_ENCODER=yes
+ !CONFIG_HEVC_AMF_ENCODER=yes
+ !CONFIG_HEVC_MF_ENCODER=yes
+@@ -1574,7 +1575,7 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_MJPEG_VAAPI_ENCODER=yes
+ !CONFIG_MP3_MF_ENCODER=yes
+ !CONFIG_MPEG2_QSV_ENCODER=yes
+-!CONFIG_MPEG2_VAAPI_ENCODER=yes
++CONFIG_MPEG2_VAAPI_ENCODER=yes
+ !CONFIG_MPEG4_OMX_ENCODER=yes
+ !CONFIG_MPEG4_V4L2M2M_ENCODER=yes
+ !CONFIG_PRORES_VIDEOTOOLBOX_ENCODER=yes
+@@ -1588,24 +1589,24 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_AV1_NVDEC_HWACCEL=yes
+ !CONFIG_AV1_VAAPI_HWACCEL=yes
+ !CONFIG_AV1_VDPAU_HWACCEL=yes
+-!CONFIG_H263_VAAPI_HWACCEL=yes
++CONFIG_H263_VAAPI_HWACCEL=yes
+ !CONFIG_H263_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_H264_D3D11VA_HWACCEL=yes
+ !CONFIG_H264_D3D11VA2_HWACCEL=yes
+ !CONFIG_H264_DXVA2_HWACCEL=yes
+ !CONFIG_H264_NVDEC_HWACCEL=yes
+-!CONFIG_H264_VAAPI_HWACCEL=yes
++CONFIG_H264_VAAPI_HWACCEL=yes
+ !CONFIG_H264_VDPAU_HWACCEL=yes
+ !CONFIG_H264_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_HEVC_D3D11VA_HWACCEL=yes
+ !CONFIG_HEVC_D3D11VA2_HWACCEL=yes
+ !CONFIG_HEVC_DXVA2_HWACCEL=yes
+ !CONFIG_HEVC_NVDEC_HWACCEL=yes
+-!CONFIG_HEVC_VAAPI_HWACCEL=yes
++CONFIG_HEVC_VAAPI_HWACCEL=yes
+ !CONFIG_HEVC_VDPAU_HWACCEL=yes
+ !CONFIG_HEVC_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_MJPEG_NVDEC_HWACCEL=yes
+-!CONFIG_MJPEG_VAAPI_HWACCEL=yes
++CONFIG_MJPEG_VAAPI_HWACCEL=yes
+ !CONFIG_MPEG1_NVDEC_HWACCEL=yes
+ !CONFIG_MPEG1_VDPAU_HWACCEL=yes
+ !CONFIG_MPEG1_VIDEOTOOLBOX_HWACCEL=yes
+@@ -1613,11 +1614,11 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_MPEG2_D3D11VA2_HWACCEL=yes
+ !CONFIG_MPEG2_NVDEC_HWACCEL=yes
+ !CONFIG_MPEG2_DXVA2_HWACCEL=yes
+-!CONFIG_MPEG2_VAAPI_HWACCEL=yes
++CONFIG_MPEG2_VAAPI_HWACCEL=yes
+ !CONFIG_MPEG2_VDPAU_HWACCEL=yes
+ !CONFIG_MPEG2_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_MPEG4_NVDEC_HWACCEL=yes
+-!CONFIG_MPEG4_VAAPI_HWACCEL=yes
++CONFIG_MPEG4_VAAPI_HWACCEL=yes
+ !CONFIG_MPEG4_VDPAU_HWACCEL=yes
+ !CONFIG_MPEG4_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_PRORES_VIDEOTOOLBOX_HWACCEL=yes
+@@ -1625,22 +1626,22 @@ CONFIG_XSUB_ENCODER=yes
+ !CONFIG_VC1_D3D11VA2_HWACCEL=yes
+ !CONFIG_VC1_DXVA2_HWACCEL=yes
+ !CONFIG_VC1_NVDEC_HWACCEL=yes
+-!CONFIG_VC1_VAAPI_HWACCEL=yes
++CONFIG_VC1_VAAPI_HWACCEL=yes
+ !CONFIG_VC1_VDPAU_HWACCEL=yes
+ !CONFIG_VP8_NVDEC_HWACCEL=yes
+-!CONFIG_VP8_VAAPI_HWACCEL=yes
++CONFIG_VP8_VAAPI_HWACCEL=yes
+ !CONFIG_VP9_D3D11VA_HWACCEL=yes
+ !CONFIG_VP9_D3D11VA2_HWACCEL=yes
+ !CONFIG_VP9_DXVA2_HWACCEL=yes
+ !CONFIG_VP9_NVDEC_HWACCEL=yes
+-!CONFIG_VP9_VAAPI_HWACCEL=yes
++CONFIG_VP9_VAAPI_HWACCEL=yes
+ !CONFIG_VP9_VDPAU_HWACCEL=yes
+ !CONFIG_VP9_VIDEOTOOLBOX_HWACCEL=yes
+ !CONFIG_WMV3_D3D11VA_HWACCEL=yes
+ !CONFIG_WMV3_D3D11VA2_HWACCEL=yes
+ !CONFIG_WMV3_DXVA2_HWACCEL=yes
+ !CONFIG_WMV3_NVDEC_HWACCEL=yes
+-!CONFIG_WMV3_VAAPI_HWACCEL=yes
++CONFIG_WMV3_VAAPI_HWACCEL=yes
+ !CONFIG_WMV3_VDPAU_HWACCEL=yes
+ CONFIG_AAC_PARSER=yes
+ CONFIG_AAC_LATM_PARSER=yes
+diff --git a/android/include/config-x86-x86.h b/android/include/config-x86-x86.h
+index 6122d576cd..b4dd0cf700 100644
+--- a/android/include/config-x86-x86.h
++++ b/android/include/config-x86-x86.h
+@@ -1318,6 +1318,10 @@
+ #undef HAVE_BCRYPT
+ #endif
+ #define HAVE_BCRYPT 0
++#ifdef HAVE_VAAPI_ANDROID
++#undef HAVE_VAAPI_ANDROID
++#endif
++#define HAVE_VAAPI_ANDROID 1
+ #ifdef HAVE_VAAPI_DRM
+ #undef HAVE_VAAPI_DRM
+ #endif
+@@ -1640,8 +1644,8 @@
+ #define CONFIG_SCALING_VIDEO_EXAMPLE 1
+ #define CONFIG_TRANSCODE_AAC_EXAMPLE 1
+ #define CONFIG_TRANSCODING_EXAMPLE 1
+-#define CONFIG_VAAPI_ENCODE_EXAMPLE 0
+-#define CONFIG_VAAPI_TRANSCODE_EXAMPLE 0
++#define CONFIG_VAAPI_ENCODE_EXAMPLE 1
++#define CONFIG_VAAPI_TRANSCODE_EXAMPLE 1
+ #define CONFIG_AVISYNTH 0
+ #define CONFIG_FREI0R 0
+ #define CONFIG_LIBCDIO 0
+@@ -1777,7 +1781,7 @@
+ #define CONFIG_FFNVCODEC 0
+ #define CONFIG_NVDEC 0
+ #define CONFIG_NVENC 0
+-#define CONFIG_VAAPI 0
++#define CONFIG_VAAPI 1
+ #define CONFIG_VDPAU 0
+ #define CONFIG_VIDEOTOOLBOX 0
+ #define CONFIG_VULKAN 0
+@@ -1833,7 +1837,7 @@
+ #define CONFIG_BSFS 1
+ #define CONFIG_DECODERS 1
+ #define CONFIG_ENCODERS 1
+-#define CONFIG_HWACCELS 0
++#define CONFIG_HWACCELS 1
+ #define CONFIG_PARSERS 1
+ #define CONFIG_INDEVS 0
+ #define CONFIG_OUTDEVS 0
+@@ -1928,8 +1932,8 @@
+ #define CONFIG_TEXTUREDSP 1
+ #define CONFIG_TEXTUREDSPENC 1
+ #define CONFIG_TPELDSP 1
+-#define CONFIG_VAAPI_1 0
+-#define CONFIG_VAAPI_ENCODE 0
++#define CONFIG_VAAPI_1 1
++#define CONFIG_VAAPI_ENCODE 1
+ #define CONFIG_VC1DSP 1
+ #define CONFIG_VIDEODSP 1
+ #define CONFIG_VP3DSP 1
+diff --git a/android/include/config-x86.asm b/android/include/config-x86.asm
+index c712846eb7..9d58ba6fe6 100644
+--- a/android/include/config-x86.asm
++++ b/android/include/config-x86.asm
+@@ -324,6 +324,7 @@
+ %define HAVE_VIRTUALALLOC 0
+ %define HAVE_WGLGETPROCADDRESS 0
+ %define HAVE_BCRYPT 0
++%define HAVE_VAAPI_ANDROID 1
+ %define HAVE_VAAPI_DRM 0
+ %define HAVE_VAAPI_X11 0
+ %define HAVE_VDPAU_X11 0
+@@ -424,8 +425,8 @@
+ %define CONFIG_SCALING_VIDEO_EXAMPLE 1
+ %define CONFIG_TRANSCODE_AAC_EXAMPLE 1
+ %define CONFIG_TRANSCODING_EXAMPLE 1
+-%define CONFIG_VAAPI_ENCODE_EXAMPLE 0
+-%define CONFIG_VAAPI_TRANSCODE_EXAMPLE 0
++%define CONFIG_VAAPI_ENCODE_EXAMPLE 1
++%define CONFIG_VAAPI_TRANSCODE_EXAMPLE 1
+ %define CONFIG_AVISYNTH 0
+ %define CONFIG_FREI0R 0
+ %define CONFIG_LIBCDIO 0
+@@ -561,7 +562,7 @@
+ %define CONFIG_FFNVCODEC 0
+ %define CONFIG_NVDEC 0
+ %define CONFIG_NVENC 0
+-%define CONFIG_VAAPI 0
++%define CONFIG_VAAPI 1
+ %define CONFIG_VDPAU 0
+ %define CONFIG_VIDEOTOOLBOX 0
+ %define CONFIG_VULKAN 0
+@@ -617,7 +618,7 @@
+ %define CONFIG_BSFS 1
+ %define CONFIG_DECODERS 1
+ %define CONFIG_ENCODERS 1
+-%define CONFIG_HWACCELS 0
++%define CONFIG_HWACCELS 1
+ %define CONFIG_PARSERS 1
+ %define CONFIG_INDEVS 0
+ %define CONFIG_OUTDEVS 0
+@@ -712,8 +713,8 @@
+ %define CONFIG_TEXTUREDSP 1
+ %define CONFIG_TEXTUREDSPENC 1
+ %define CONFIG_TPELDSP 1
+-%define CONFIG_VAAPI_1 0
+-%define CONFIG_VAAPI_ENCODE 0
++%define CONFIG_VAAPI_1 1
++%define CONFIG_VAAPI_ENCODE 1
+ %define CONFIG_VC1DSP 1
+ %define CONFIG_VIDEODSP 1
+ %define CONFIG_VP3DSP 1
+diff --git a/android/include/config-x86_64-x86_64.h b/android/include/config-x86_64-x86_64.h
+index b6ebb6fe98..24a057dd80 100644
+--- a/android/include/config-x86_64-x86_64.h
++++ b/android/include/config-x86_64-x86_64.h
+@@ -1318,6 +1318,10 @@
+ #undef HAVE_BCRYPT
+ #endif
+ #define HAVE_BCRYPT 0
++#ifdef HAVE_VAAPI_ANDROID
++#undef HAVE_VAAPI_ANDROID
++#endif
++#define HAVE_VAAPI_ANDROID 1
+ #ifdef HAVE_VAAPI_DRM
+ #undef HAVE_VAAPI_DRM
+ #endif
+@@ -1640,8 +1644,8 @@
+ #define CONFIG_SCALING_VIDEO_EXAMPLE 1
+ #define CONFIG_TRANSCODE_AAC_EXAMPLE 1
+ #define CONFIG_TRANSCODING_EXAMPLE 1
+-#define CONFIG_VAAPI_ENCODE_EXAMPLE 0
+-#define CONFIG_VAAPI_TRANSCODE_EXAMPLE 0
++#define CONFIG_VAAPI_ENCODE_EXAMPLE 1
++#define CONFIG_VAAPI_TRANSCODE_EXAMPLE 1
+ #define CONFIG_AVISYNTH 0
+ #define CONFIG_FREI0R 0
+ #define CONFIG_LIBCDIO 0
+@@ -1777,7 +1781,7 @@
+ #define CONFIG_FFNVCODEC 0
+ #define CONFIG_NVDEC 0
+ #define CONFIG_NVENC 0
+-#define CONFIG_VAAPI 0
++#define CONFIG_VAAPI 1
+ #define CONFIG_VDPAU 0
+ #define CONFIG_VIDEOTOOLBOX 0
+ #define CONFIG_VULKAN 0
+@@ -1833,7 +1837,7 @@
+ #define CONFIG_BSFS 1
+ #define CONFIG_DECODERS 1
+ #define CONFIG_ENCODERS 1
+-#define CONFIG_HWACCELS 0
++#define CONFIG_HWACCELS 1
+ #define CONFIG_PARSERS 1
+ #define CONFIG_INDEVS 0
+ #define CONFIG_OUTDEVS 0
+@@ -1928,8 +1932,8 @@
+ #define CONFIG_TEXTUREDSP 1
+ #define CONFIG_TEXTUREDSPENC 1
+ #define CONFIG_TPELDSP 1
+-#define CONFIG_VAAPI_1 0
+-#define CONFIG_VAAPI_ENCODE 0
++#define CONFIG_VAAPI_1 1
++#define CONFIG_VAAPI_ENCODE 1
+ #define CONFIG_VC1DSP 1
+ #define CONFIG_VIDEODSP 1
+ #define CONFIG_VP3DSP 1
+diff --git a/android/include/config-x86_64.asm b/android/include/config-x86_64.asm
+index f94db0d750..e929256884 100644
+--- a/android/include/config-x86_64.asm
++++ b/android/include/config-x86_64.asm
+@@ -324,6 +324,7 @@
+ %define HAVE_VIRTUALALLOC 0
+ %define HAVE_WGLGETPROCADDRESS 0
+ %define HAVE_BCRYPT 0
++%define HAVE_VAAPI_ANDROID 1
+ %define HAVE_VAAPI_DRM 0
+ %define HAVE_VAAPI_X11 0
+ %define HAVE_VDPAU_X11 0
+@@ -424,8 +425,8 @@
+ %define CONFIG_SCALING_VIDEO_EXAMPLE 1
+ %define CONFIG_TRANSCODE_AAC_EXAMPLE 1
+ %define CONFIG_TRANSCODING_EXAMPLE 1
+-%define CONFIG_VAAPI_ENCODE_EXAMPLE 0
+-%define CONFIG_VAAPI_TRANSCODE_EXAMPLE 0
++%define CONFIG_VAAPI_ENCODE_EXAMPLE 1
++%define CONFIG_VAAPI_TRANSCODE_EXAMPLE 1
+ %define CONFIG_AVISYNTH 0
+ %define CONFIG_FREI0R 0
+ %define CONFIG_LIBCDIO 0
+@@ -561,7 +562,7 @@
+ %define CONFIG_FFNVCODEC 0
+ %define CONFIG_NVDEC 0
+ %define CONFIG_NVENC 0
+-%define CONFIG_VAAPI 0
++%define CONFIG_VAAPI 1
+ %define CONFIG_VDPAU 0
+ %define CONFIG_VIDEOTOOLBOX 0
+ %define CONFIG_VULKAN 0
+@@ -617,7 +618,7 @@
+ %define CONFIG_BSFS 1
+ %define CONFIG_DECODERS 1
+ %define CONFIG_ENCODERS 1
+-%define CONFIG_HWACCELS 0
++%define CONFIG_HWACCELS 1
+ %define CONFIG_PARSERS 1
+ %define CONFIG_INDEVS 0
+ %define CONFIG_OUTDEVS 0
+@@ -712,8 +713,8 @@
+ %define CONFIG_TEXTUREDSP 1
+ %define CONFIG_TEXTUREDSPENC 1
+ %define CONFIG_TPELDSP 1
+-%define CONFIG_VAAPI_1 0
+-%define CONFIG_VAAPI_ENCODE 0
++%define CONFIG_VAAPI_1 1
++%define CONFIG_VAAPI_ENCODE 1
+ %define CONFIG_VC1DSP 1
+ %define CONFIG_VIDEODSP 1
+ %define CONFIG_VP3DSP 1
+diff --git a/android/include/config_components.h b/android/include/config_components.h
+index 09cb87493d..fa87137d51 100644
+--- a/android/include/config_components.h
++++ b/android/include/config_components.h
+@@ -819,7 +819,7 @@
+ #define CONFIG_H264_OMX_ENCODER 0
+ #define CONFIG_H264_QSV_ENCODER 0
+ #define CONFIG_H264_V4L2M2M_ENCODER 0
+-#define CONFIG_H264_VAAPI_ENCODER 0
++#define CONFIG_H264_VAAPI_ENCODER 1
+ #define CONFIG_H264_VIDEOTOOLBOX_ENCODER 0
+ #define CONFIG_HEVC_AMF_ENCODER 0
+ #define CONFIG_HEVC_MF_ENCODER 0
+@@ -833,7 +833,7 @@
+ #define CONFIG_MJPEG_VAAPI_ENCODER 0
+ #define CONFIG_MP3_MF_ENCODER 0
+ #define CONFIG_MPEG2_QSV_ENCODER 0
+-#define CONFIG_MPEG2_VAAPI_ENCODER 0
++#define CONFIG_MPEG2_VAAPI_ENCODER 1
+ #define CONFIG_MPEG4_OMX_ENCODER 0
+ #define CONFIG_MPEG4_V4L2M2M_ENCODER 0
+ #define CONFIG_PRORES_VIDEOTOOLBOX_ENCODER 0
+@@ -847,24 +847,24 @@
+ #define CONFIG_AV1_NVDEC_HWACCEL 0
+ #define CONFIG_AV1_VAAPI_HWACCEL 0
+ #define CONFIG_AV1_VDPAU_HWACCEL 0
+-#define CONFIG_H263_VAAPI_HWACCEL 0
++#define CONFIG_H263_VAAPI_HWACCEL 1
+ #define CONFIG_H263_VIDEOTOOLBOX_HWACCEL 0
+ #define CONFIG_H264_D3D11VA_HWACCEL 0
+ #define CONFIG_H264_D3D11VA2_HWACCEL 0
+ #define CONFIG_H264_DXVA2_HWACCEL 0
+ #define CONFIG_H264_NVDEC_HWACCEL 0
+-#define CONFIG_H264_VAAPI_HWACCEL 0
++#define CONFIG_H264_VAAPI_HWACCEL 1
+ #define CONFIG_H264_VDPAU_HWACCEL 0
+ #define CONFIG_H264_VIDEOTOOLBOX_HWACCEL 0
+ #define CONFIG_HEVC_D3D11VA_HWACCEL 0
+ #define CONFIG_HEVC_D3D11VA2_HWACCEL 0
+ #define CONFIG_HEVC_DXVA2_HWACCEL 0
+ #define CONFIG_HEVC_NVDEC_HWACCEL 0
+-#define CONFIG_HEVC_VAAPI_HWACCEL 0
++#define CONFIG_HEVC_VAAPI_HWACCEL 1
+ #define CONFIG_HEVC_VDPAU_HWACCEL 0
+ #define CONFIG_HEVC_VIDEOTOOLBOX_HWACCEL 0
+ #define CONFIG_MJPEG_NVDEC_HWACCEL 0
+-#define CONFIG_MJPEG_VAAPI_HWACCEL 0
++#define CONFIG_MJPEG_VAAPI_HWACCEL 1
+ #define CONFIG_MPEG1_NVDEC_HWACCEL 0
+ #define CONFIG_MPEG1_VDPAU_HWACCEL 0
+ #define CONFIG_MPEG1_VIDEOTOOLBOX_HWACCEL 0
+@@ -872,11 +872,11 @@
+ #define CONFIG_MPEG2_D3D11VA2_HWACCEL 0
+ #define CONFIG_MPEG2_NVDEC_HWACCEL 0
+ #define CONFIG_MPEG2_DXVA2_HWACCEL 0
+-#define CONFIG_MPEG2_VAAPI_HWACCEL 0
++#define CONFIG_MPEG2_VAAPI_HWACCEL 1
+ #define CONFIG_MPEG2_VDPAU_HWACCEL 0
+ #define CONFIG_MPEG2_VIDEOTOOLBOX_HWACCEL 0
+ #define CONFIG_MPEG4_NVDEC_HWACCEL 0
+-#define CONFIG_MPEG4_VAAPI_HWACCEL 0
++#define CONFIG_MPEG4_VAAPI_HWACCEL 1
+ #define CONFIG_MPEG4_VDPAU_HWACCEL 0
+ #define CONFIG_MPEG4_VIDEOTOOLBOX_HWACCEL 0
+ #define CONFIG_PRORES_VIDEOTOOLBOX_HWACCEL 0
+@@ -884,22 +884,22 @@
+ #define CONFIG_VC1_D3D11VA2_HWACCEL 0
+ #define CONFIG_VC1_DXVA2_HWACCEL 0
+ #define CONFIG_VC1_NVDEC_HWACCEL 0
+-#define CONFIG_VC1_VAAPI_HWACCEL 0
++#define CONFIG_VC1_VAAPI_HWACCEL 1
+ #define CONFIG_VC1_VDPAU_HWACCEL 0
+ #define CONFIG_VP8_NVDEC_HWACCEL 0
+-#define CONFIG_VP8_VAAPI_HWACCEL 0
++#define CONFIG_VP8_VAAPI_HWACCEL 1
+ #define CONFIG_VP9_D3D11VA_HWACCEL 0
+ #define CONFIG_VP9_D3D11VA2_HWACCEL 0
+ #define CONFIG_VP9_DXVA2_HWACCEL 0
+ #define CONFIG_VP9_NVDEC_HWACCEL 0
+-#define CONFIG_VP9_VAAPI_HWACCEL 0
++#define CONFIG_VP9_VAAPI_HWACCEL 1
+ #define CONFIG_VP9_VDPAU_HWACCEL 0
+ #define CONFIG_VP9_VIDEOTOOLBOX_HWACCEL 0
+ #define CONFIG_WMV3_D3D11VA_HWACCEL 0
+ #define CONFIG_WMV3_D3D11VA2_HWACCEL 0
+ #define CONFIG_WMV3_DXVA2_HWACCEL 0
+ #define CONFIG_WMV3_NVDEC_HWACCEL 0
+-#define CONFIG_WMV3_VAAPI_HWACCEL 0
++#define CONFIG_WMV3_VAAPI_HWACCEL 1
+ #define CONFIG_WMV3_VDPAU_HWACCEL 0
+ #define CONFIG_AAC_PARSER 1
+ #define CONFIG_AAC_LATM_PARSER 1
+diff --git a/android/include/libavcodec/codec_list.c b/android/include/libavcodec/codec_list.c
+index db8c8d7d4e..799bb609b4 100644
+--- a/android/include/libavcodec/codec_list.c
++++ b/android/include/libavcodec/codec_list.c
+@@ -172,6 +172,8 @@ static const FFCodec * const codec_list[] = {
+     &ff_ttml_encoder,
+     &ff_webvtt_encoder,
+     &ff_xsub_encoder,
++    &ff_h264_vaapi_encoder,
++    &ff_mpeg2_vaapi_encoder,
+     &ff_aasc_decoder,
+     &ff_aic_decoder,
+     &ff_alias_pix_decoder,
+diff --git a/configure b/configure
+index 58f5cc90f4..51a8302769 100755
+--- a/configure
++++ b/configure
+@@ -2321,6 +2321,7 @@ SYSTEM_FUNCS="
+ 
+ SYSTEM_LIBRARIES="
+     bcrypt
++    vaapi_android
+     vaapi_drm
+     vaapi_x11
+     vdpau_x11
+@@ -6959,6 +6960,11 @@ if enabled x86; then
+     case $target_os in
+         mingw32*|mingw64*|win32|win64|linux|cygwin*)
+             ;;
++        android)
++            hevc_vaapi_hwaccel_deps="vaapi"
++            vp9_vaapi_hwaccel_deps="vaapi"
++            enable vaapi vaapi_1 vaapi_android
++            ;&
+         *)
+             disable ffnvcodec cuvid nvdec nvenc
+             ;;
+diff --git a/libavcodec/Android.mk b/libavcodec/Android.mk
+index 758c181f42..47a8864c3b 100644
+--- a/libavcodec/Android.mk
++++ b/libavcodec/Android.mk
+@@ -19,6 +19,10 @@ LOCAL_C_INCLUDES +=		\
+ LOCAL_SHARED_LIBRARIES +=	\
+ 	libz \
+ 
++ifeq ($(CONFIG_VAAPI),yes)
++  LOCAL_SHARED_LIBRARIES += libva
++endif
++
+ ifneq ($(ARCH_ARM_HAVE_NEON),)
+   LOCAL_SRC_FILES += neon/mpegvideo.c
+ endif
+@@ -35,6 +39,10 @@ LOCAL_C_INCLUDES +=		\
+ LOCAL_SHARED_LIBRARIES +=	\
+ 	libz \
+ 
++ifeq ($(CONFIG_VAAPI),yes)
++  LOCAL_SHARED_LIBRARIES += libva
++endif
++
+ ifneq ($(ARCH_ARM_HAVE_NEON),)
+   LOCAL_SRC_FILES += neon/mpegvideo.c
+ endif
+diff --git a/libavutil/Android.mk b/libavutil/Android.mk
+index d31b16dca4..a4c34bae7a 100644
+--- a/libavutil/Android.mk
++++ b/libavutil/Android.mk
+@@ -13,6 +13,12 @@ LOCAL_PATH := $(call my-dir)
+ FFMPEG_MULTILIB := 32
+ include $(LOCAL_PATH)/../android/build.mk
+ 
++ifeq ($(CONFIG_VAAPI),yes)
++LOCAL_SHARED_LIBRARIES +=	\
++	libva \
++	libva-android
++endif
++
+ LOCAL_C_INCLUDES += bionic/libc/include
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
+@@ -24,6 +30,12 @@ include $(BUILD_SHARED_LIBRARY)
+ FFMPEG_MULTILIB := 64
+ include $(LOCAL_PATH)/../android/build.mk
+ 
++ifeq ($(CONFIG_VAAPI),yes)
++LOCAL_SHARED_LIBRARIES +=	\
++	libva \
++	libva-android
++endif
++
+ LOCAL_C_INCLUDES += bionic/libc/include
+ 
+ LOCAL_MULTILIB := $(FFMPEG_MULTILIB)
+diff --git a/libavutil/hwcontext_vaapi.c b/libavutil/hwcontext_vaapi.c
+index c3a98bc4b1..01ac91c33b 100644
+--- a/libavutil/hwcontext_vaapi.c
++++ b/libavutil/hwcontext_vaapi.c
+@@ -24,6 +24,9 @@
+ #if HAVE_VAAPI_DRM
+ #   include <va/va_drm.h>
+ #endif
++#if HAVE_VAAPI_ANDROID
++#   include <va/va_android.h>
++#endif
+ 
+ #if CONFIG_LIBDRM
+ #   include <va/va_drmcommon.h>
+@@ -1742,6 +1745,22 @@ static int vaapi_device_create(AVHWDeviceContext *ctx, const char *device,
+     }
+ #endif
+ 
++#if HAVE_VAAPI_ANDROID
++    if (!display) {
++        int mDisplay;
++        mDisplay = 0x18C34078;
++        display = vaGetDisplay(&mDisplay);
++        if (!display) {
++            av_log(ctx, AV_LOG_ERROR, "Cannot open a VA display "
++                   "from Android device %s.\n", device);
++            return AVERROR_UNKNOWN;
++        }
++
++        av_log(ctx, AV_LOG_VERBOSE, "Opened VA display via "
++               "Android device %s.\n", device);
++    }
++#endif
++
+     if (!display) {
+         if (device)
+             av_log(ctx, AV_LOG_ERROR, "No VA display found for "

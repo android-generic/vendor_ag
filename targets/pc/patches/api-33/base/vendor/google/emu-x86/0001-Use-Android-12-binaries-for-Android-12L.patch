@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Wed, 23 Mar 2022 14:27:10 +0100
+Subject: [PATCH] Use Android 12 binaries for Android 12L
+
+---
+ download-files.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/download-files.sh b/download-files.sh
+index 85195d5..96e6a41 100755
+--- a/download-files.sh
++++ b/download-files.sh
+@@ -30,7 +30,7 @@ if [ -f ../../../../build/make/core/version_defaults.mk ]; then
+ 			ASEMU_REPO="google_apis_playstore"
+ 		fi
+     fi
+-    if grep -q "PLATFORM_SDK_VERSION := 31" ../../../../build/make/core/version_defaults.mk; then
++    if grep -q "PLATFORM_SDK_VERSION := 3[12]" ../../../../build/make/core/version_defaults.mk; then
+         if [ "$1" = "x86_64" ];then
+ 			ASEMU_SHA1SUM="f5b2daa09b48de21a3acbbbe1c6b6c55c0cafe21"
+ 			ASEMU_FILE="x86_64-31_r08-linux"

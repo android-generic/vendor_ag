@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 9 Jun 2022 14:42:46 +0200
+Subject: [PATCH] Fix kbd sensor
+
+The native SensorService expects individual sensor to send
+FLUSH_COMPLETE metadata event in response to a flush command. Until the
+event is triggered, no event from that sensor is dispatched to
+listeners. By making the kbd sensor to return -EINVAL, the native
+service will not wait for the FLUSH_COMPLETE event, and events will be
+dispatched right away.
+---
+ kbdsensor.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kbdsensor.cpp b/kbdsensor.cpp
+index 47695f5..e953923 100644
+--- a/kbdsensor.cpp
++++ b/kbdsensor.cpp
+@@ -225,7 +225,7 @@ int SensorPollContext::poll_batch(struct sensors_poll_device_1* dev, int sensor_
+ int SensorPollContext::poll_flush(struct sensors_poll_device_1* dev, int sensor_handle)
+ {
+ 	ALOGD("%s: dev=%p sensor_handle=%d", __FUNCTION__, dev, sensor_handle);
+-	return EXIT_SUCCESS;
++	return -EINVAL;
+ }
+ 
+ int SensorPollContext::doPoll(sensors_event_t *data, int count)

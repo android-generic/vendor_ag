@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Sat, 10 Sep 2022 16:26:24 +0200
+Subject: [PATCH] Fix build error with filename containing comma
+
+This fixes the following build error during ckati step:
+
+build/make/core/main.mk:2011: error: missing separator.
+
+This comes during the metadata license processing, from the presence of
+filenames with comma (in device/generic/firmware).
+
+Change-Id: Ib7894c9a15d684d35a2118a05fde3dac2d52200b
+---
+ core/definitions.mk | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/core/definitions.mk b/core/definitions.mk
+index 0c46de9fc..ba893133c 100644
+--- a/core/definitions.mk
++++ b/core/definitions.mk
+@@ -661,8 +661,9 @@ $(strip $(eval _deps := $(sort $(filter-out 0p: :,$(foreach d,$(strip $(ALL_NON_
+ $(strip $(eval _notices := $(sort $(ALL_NON_MODULES.$(_tgt).NOTICES))))
+ $(strip $(eval _path := $(sort $(ALL_NON_MODULES.$(_tgt).PATH))))
+ $(strip $(eval _install_map := $(ALL_NON_MODULES.$(_tgt).ROOT_MAPPINGS)))
++$(strip $(eval _comma := ,))
+ $(strip $(eval \
+-  $$(foreach d,$(strip $(ALL_NON_MODULES.$(_tgt).DEPENDENCIES)), \
++  $$(foreach d,$(subst $(_comma),$$(_comma),$(strip $(ALL_NON_MODULES.$(_tgt).DEPENDENCIES))), \
+     $$(if $$(strip $$(ALL_TARGETS.$$(d).META_LIC)), \
+       , \
+       $$(eval NON_MODULES_WITHOUT_LICENSE_METADATA += $$(d))) \

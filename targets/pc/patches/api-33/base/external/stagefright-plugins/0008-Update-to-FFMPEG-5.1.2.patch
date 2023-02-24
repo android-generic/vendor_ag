@@ -1,0 +1,805 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 6 Oct 2022 11:57:22 +0200
+Subject: [PATCH 08/13] Update to FFMPEG 5.1.2
+
+Remove use of FFMPEG deprecated API:
+- use AVChannelLayout API
+- adapt to constified API
+- adapt to header relocation/shuffle
+
+Control FFMPEG loglevel with property debug.ffmpeg loglevel, drop
+obsolete property debug.nam.ffmpeg.
+
+Make FFSource returns EOS when reading 0 bytes on a local file. It fixes
+and infinite read loop in the extractor, when sniffing local files.
+FileSource::readAt() eventually calls ::read(), which returns 0 on
+end-of file.
+---
+ extractor/FFmpegExtractor.cpp |   8 +--
+ omx/Android.mk                |   2 -
+ omx/SoftFFmpegAudio.cpp       | 129 +++++++++++++++++-----------------
+ omx/SoftFFmpegAudio.h         |   2 -
+ omx/SoftFFmpegVideo.cpp       |  22 ++++--
+ omx/SoftFFmpegVideo.h         |   1 -
+ utils/ffmpeg_cmdutils.c       |   5 +-
+ utils/ffmpeg_source.cpp       |  37 ++++++++--
+ utils/ffmpeg_utils.cpp        |  39 ++++++++--
+ utils/ffmpeg_utils.h          |   1 +
+ 10 files changed, 156 insertions(+), 90 deletions(-)
+
+diff --git a/extractor/FFmpegExtractor.cpp b/extractor/FFmpegExtractor.cpp
+index 74aba4a..2876588 100644
+--- a/extractor/FFmpegExtractor.cpp
++++ b/extractor/FFmpegExtractor.cpp
+@@ -558,11 +558,11 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
+         ALOGD("[audio] bit_rate: %" PRId64 ", sample_rate: %d, channels: %d, "
+                 "bits_per_coded_sample: %d, block_align: %d "
+                 "bits_per_raw_sample: %d, sample_format: %d",
+-                avpar->bit_rate, avpar->sample_rate, avpar->channels,
++                avpar->bit_rate, avpar->sample_rate, avpar->ch_layout.nb_channels,
+                 avpar->bits_per_coded_sample, avpar->block_align,
+                 avpar->bits_per_raw_sample, avpar->format);
+ 
+-        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, avpar->channels);
++        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, avpar->ch_layout.nb_channels);
+         AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avpar->bit_rate);
+         int32_t bits = avpar->bits_per_raw_sample > 0 ?
+                 avpar->bits_per_raw_sample :
+@@ -1132,11 +1132,11 @@ int FFmpegExtractor::feedNextPacket() {
+                 return ret;
+             }
+             if (mDefersToCreateAudioTrack && avpar->extradata_size <= 0) {
+-                int new_extradata_size = 0;
++                size_t new_extradata_size = 0;
+                 uint8_t* new_extradata = av_packet_get_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA, &new_extradata_size);
+ 
+                 if (new_extradata_size > 0) {
+-                    ALOGV("[audio::%s] extradata found, len=%d", mAudioBsfc->filter->name, new_extradata_size);
++                    ALOGV("[audio::%s] extradata found, len=%zd", mAudioBsfc->filter->name, new_extradata_size);
+                     avpar->extradata = (uint8_t*)av_mallocz(new_extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+                     if (avpar->extradata) {
+                         memcpy(avpar->extradata, new_extradata, new_extradata_size);
+diff --git a/omx/Android.mk b/omx/Android.mk
+index 00fd63d..ead5d40 100644
+--- a/omx/Android.mk
++++ b/omx/Android.mk
+@@ -2,8 +2,6 @@ LOCAL_PATH := $(call my-dir)
+ 
+ include $(SF_COMMON_MK)
+ 
+-LOCAL_CFLAGS += -Wno-deprecated-declarations
+-
+ LOCAL_SRC_FILES := \
+ 	FFmpegOMXPlugin.cpp \
+ 	SoftFFmpegAudio.cpp \
+diff --git a/omx/SoftFFmpegAudio.cpp b/omx/SoftFFmpegAudio.cpp
+index 535c9ee..6b72202 100644
+--- a/omx/SoftFFmpegAudio.cpp
++++ b/omx/SoftFFmpegAudio.cpp
+@@ -143,7 +143,7 @@ void SoftFFmpegAudio::initPorts() {
+     addPort(def);
+ }
+ 
+-void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec) {
++void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec __unused) {
+     int fast = 0;
+ 
+     avctx->workaround_bugs   = 1;
+@@ -167,7 +167,7 @@ bool SoftFFmpegAudio::isConfigured() {
+ }
+ 
+ void SoftFFmpegAudio::resetCtx() {
+-    mCtx->channels = 0;
++    av_channel_layout_uninit(&mCtx->ch_layout);
+     mCtx->sample_rate = 0;
+     mCtx->bit_rate = 0;
+     mCtx->sample_fmt = AV_SAMPLE_FMT_NONE;
+@@ -175,8 +175,6 @@ void SoftFFmpegAudio::resetCtx() {
+     mAudioSrcChannels = mAudioTgtChannels = 2;
+     mAudioSrcFreq = mAudioTgtFreq = 44100;
+     mAudioSrcFmt = mAudioTgtFmt = AV_SAMPLE_FMT_NONE;
+-    mAudioSrcChannelLayout = mAudioTgtChannelLayout =
+-        av_get_default_channel_layout(mAudioSrcChannels);
+ }
+ 
+ void SoftFFmpegAudio::initVorbisHdr() {
+@@ -335,7 +333,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+             profile->eAACStreamFormat = OMX_AUDIO_AACStreamFormatMP4FF;
+             profile->eChannelMode = OMX_AUDIO_ChannelModeStereo;
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioAac params, nChannels:%u, nSampleRate:%u",
+@@ -382,7 +380,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+             profile->eChannelMode = OMX_AUDIO_ChannelModeStereo;
+             profile->eFormat = OMX_AUDIO_MP3StreamFormatMP1Layer3;
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioMp3 params, nChannels:%u, nSampleRate:%u",
+@@ -407,7 +405,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+             profile->bManaged = OMX_FALSE;
+             profile->bDownmix = OMX_FALSE;
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioVorbis params, nChannels:%u, nSampleRate:%u",
+@@ -427,7 +425,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+ 
+             profile->eFormat = OMX_AUDIO_WMAFormatUnused;
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSamplingRate = mCtx->sample_rate;
+ 
+             profile->nBlockAlign = mCtx->block_align;
+@@ -450,7 +448,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+ 
+             profile->eFormat = OMX_AUDIO_RAFormatUnused;
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSamplingRate = mCtx->sample_rate;
+ 
+             profile->nNumRegions = mCtx->block_align;
+@@ -470,7 +468,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+             profile->nCompressionLevel = mCtx->bits_per_raw_sample;
+ 
+@@ -489,7 +487,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioMp2 params, nChannels:%u, nSampleRate:%u",
+@@ -507,7 +505,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioAndroidAc3 params, nChannels:%u, nSampleRate:%u",
+@@ -526,7 +524,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSamplingRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioAc3 params, nChannels:%u, nSamplingRate:%u",
+@@ -544,7 +542,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSamplingRate = mCtx->sample_rate;
+ 
+             profile->nBitsPerSample = mCtx->bits_per_coded_sample;
+@@ -564,7 +562,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSamplingRate = mCtx->sample_rate;
+ 
+             profile->nBitsPerSample = mCtx->bits_per_coded_sample;
+@@ -584,7 +582,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSamplingRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioDts params, nChannels:%u, nSamplingRate:%u",
+@@ -609,7 +607,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
+             profile->nBitsPerSample = mCtx->bits_per_raw_sample;
+             profile->eSampleFormat = mCtx->sample_fmt;
+ 
+-            profile->nChannels = mCtx->channels;
++            profile->nChannels = mCtx->ch_layout.nb_channels;
+             profile->nSampleRate = mCtx->sample_rate;
+ 
+             ALOGV("get OMX_IndexParamAudioFFmpeg params, nChannels:%u, nSampleRate:%u",
+@@ -643,17 +641,15 @@ void SoftFFmpegAudio::adjustAudioParams() {
+ 
+     // let android audio mixer to downmix if there is no multichannel output
+     // and use number of channels from the source file, useful for HDMI/offload output
+-    mAudioTgtChannels = mCtx->channels;
++    mAudioTgtChannels = mCtx->ch_layout.nb_channels;
+ 
+     mAudioTgtFreq = FFMIN(192000, FFMAX(8000, mCtx->sample_rate));
+ 
+-    mAudioTgtChannels = mCtx->channels;
++    mAudioTgtChannels = mCtx->ch_layout.nb_channels;
+     mAudioTgtFreq = mCtx->sample_rate;
+ 
+-    mAudioTgtChannelLayout = av_get_default_channel_layout(mAudioTgtChannels);
+-
+     ALOGV("adjustAudioParams: [channels=%d freq=%d fmt=%s]",
+-            mCtx->channels, mCtx->sample_rate, av_get_sample_fmt_name(mAudioTgtFmt));
++            mCtx->ch_layout.nb_channels, mCtx->sample_rate, av_get_sample_fmt_name(mAudioTgtFmt));
+ }
+ 
+ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+@@ -700,7 +696,6 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+ 
+             mAudioTgtFreq = profile->nSamplingRate;
+             mAudioTgtChannels = profile->nChannels;
+-            mAudioTgtChannelLayout = av_get_default_channel_layout(mAudioTgtChannels);
+ 
+             ALOGV("set OMX_IndexParamAudioPcm, nChannels:%u, "
+                     "nSampleRate:%u, nBitPerSample:%u",
+@@ -719,7 +714,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSampleRate;
+ 
+             adjustAudioParams();
+@@ -739,7 +734,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSampleRate;
+ 
+             adjustAudioParams();
+@@ -759,7 +754,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSampleRate;
+ 
+             adjustAudioParams();
+@@ -794,7 +789,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSamplingRate;
+ 
+             // wmadec needs bitrate, block_align
+@@ -820,7 +815,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSamplingRate;
+ 
+             // FIXME, HACK!!!, I use the nNumRegions parameter pass blockAlign!!!
+@@ -845,7 +840,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSampleRate;
+ 
+             adjustAudioParams();
+@@ -865,7 +860,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSampleRate;
+ 
+             adjustAudioParams();
+@@ -885,7 +880,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSamplingRate;
+ 
+             adjustAudioParams();
+@@ -905,7 +900,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSampleRate;
+ 
+             adjustAudioParams();
+@@ -925,7 +920,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSamplingRate;
+             mCtx->bits_per_coded_sample = profile->nBitsPerSample;
+ 
+@@ -948,7 +943,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSamplingRate;
+             mCtx->bits_per_coded_sample = profile->nBitsPerSample;
+ 
+@@ -971,7 +966,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+                 return OMX_ErrorUndefined;
+             }
+ 
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->sample_rate = profile->nSamplingRate;
+ 
+             adjustAudioParams();
+@@ -992,7 +987,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
+             }
+ 
+             mCtx->codec_id = (enum AVCodecID)profile->eCodecId;
+-            mCtx->channels = profile->nChannels;
++            av_channel_layout_default(&mCtx->ch_layout, profile->nChannels);
+             mCtx->bit_rate = profile->nBitRate;
+             mCtx->sample_rate = profile->nSampleRate;
+             mCtx->block_align = profile->nBlockAlign;
+@@ -1127,7 +1122,7 @@ int32_t SoftFFmpegAudio::openDecoder() {
+ 
+     ALOGD("begin to open ffmpeg audio decoder(%s), mCtx sample_rate: %d, channels: %d",
+            avcodec_get_name(mCtx->codec_id),
+-           mCtx->sample_rate, mCtx->channels);
++           mCtx->sample_rate, mCtx->ch_layout.nb_channels);
+ 
+     int err = avcodec_open2(mCtx, mCtx->codec, NULL);
+     if (err < 0) {
+@@ -1139,7 +1134,7 @@ int32_t SoftFFmpegAudio::openDecoder() {
+     ALOGD("open ffmpeg audio decoder(%s) success, mCtx sample_rate: %d, "
+             "channels: %d, sample_fmt: %s, bits_per_coded_sample: %d, bits_per_raw_sample: %d",
+             avcodec_get_name(mCtx->codec_id),
+-            mCtx->sample_rate, mCtx->channels,
++            mCtx->sample_rate, mCtx->ch_layout.nb_channels,
+             av_get_sample_fmt_name(mCtx->sample_fmt),
+             mCtx->bits_per_coded_sample, mCtx->bits_per_raw_sample);
+ 
+@@ -1150,9 +1145,8 @@ int32_t SoftFFmpegAudio::openDecoder() {
+     }
+ 
+     mAudioSrcFmt = mCtx->sample_fmt;
+-    mAudioSrcChannels = mCtx->channels;
++    mAudioSrcChannels = mCtx->ch_layout.nb_channels;
+     mAudioSrcFreq = mCtx->sample_rate;
+-    mAudioSrcChannelLayout = av_get_default_channel_layout(mCtx->channels);
+ 
+     return ERR_OK;
+ }
+@@ -1231,9 +1225,21 @@ int32_t SoftFFmpegAudio::decodeAudio() {
+     }
+ 
+     initPacket(mPacket, inHeader);
+-    len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, mPacket);
++    len = avcodec_send_packet(mCtx, mPacket);
+     av_packet_unref(mPacket);
+ 
++    if (len < 0 && len != AVERROR(EAGAIN)) {
++        ALOGE("ffmpeg audio decoder failed to send packet. (%d)", len);
++        // don't send error to OMXCodec, skip packet!
++    }
++
++    len = avcodec_receive_frame(mCtx, mFrame);
++
++    if (len == 0 || len == AVERROR(EAGAIN)) {
++        gotFrm = (len == 0);
++        len = mInputBufferSize;
++    }
++
+     //a negative error code is returned if an error occurred during decoding
+     if (len < 0) {
+         ALOGW("ffmpeg audio decoder err, we skip the frame and play silence instead");
+@@ -1291,11 +1297,9 @@ int32_t SoftFFmpegAudio::decodeAudio() {
+ #endif
+ 
+ int32_t SoftFFmpegAudio::resampleAudio() {
+-    int channels = 0;
+-    int64_t channelLayout = 0;
+     size_t dataSize = 0;
+ 
+-    dataSize = av_samples_get_buffer_size(NULL, av_frame_get_channels(mFrame),
++    dataSize = av_samples_get_buffer_size(NULL, mFrame->ch_layout.nb_channels,
+             mFrame->nb_samples, (enum AVSampleFormat)mFrame->format, 1);
+ 
+ #if DEBUG_FRM
+@@ -1303,19 +1307,14 @@ int32_t SoftFFmpegAudio::resampleAudio() {
+             mFrame->nb_samples, dataSize);
+ #endif
+ 
+-    channels = av_get_channel_layout_nb_channels(mFrame->channel_layout);
+-    channelLayout =
+-        (mFrame->channel_layout && av_frame_get_channels(mFrame) == channels) ?
+-        mFrame->channel_layout : av_get_default_channel_layout(av_frame_get_channels(mFrame));
+-
+     // Create if we're reconfiguring, if the format changed mid-stream, or
+     // if the output format is actually different
+     if ((mReconfiguring && mSwrCtx) || (!mSwrCtx
+             && (mFrame->format != mAudioSrcFmt
+-                || channelLayout != mAudioSrcChannelLayout
++                || mFrame->ch_layout.nb_channels != mAudioSrcChannels
+                 || (unsigned int)mFrame->sample_rate != mAudioSrcFreq
+                 || mAudioSrcFmt != mAudioTgtFmt
+-                || mAudioSrcChannelLayout != mAudioTgtChannelLayout
++                || mAudioSrcChannels != mAudioTgtChannels
+                 || mAudioSrcFreq != mAudioTgtFreq))) {
+ #ifdef LIBAV_CONFIG_H
+         if (!mSwrCtx) {
+@@ -1323,17 +1322,22 @@ int32_t SoftFFmpegAudio::resampleAudio() {
+         if (mSwrCtx) {
+             swr_free(&mSwrCtx);
+         }
+-        mSwrCtx = swr_alloc_set_opts(NULL,
+-                mAudioTgtChannelLayout, mAudioTgtFmt,                     mAudioTgtFreq,
+-                channelLayout,       (enum AVSampleFormat)mFrame->format, mFrame->sample_rate,
++
++        AVChannelLayout channelLayout;
++
++        av_channel_layout_default(&channelLayout, mAudioTgtChannels);
++        swr_alloc_set_opts2(&mSwrCtx,
++                &channelLayout, mAudioTgtFmt, mAudioTgtFreq,
++                &mFrame->ch_layout, (enum AVSampleFormat)mFrame->format, mFrame->sample_rate,
+                 0, NULL);
++        av_channel_layout_uninit(&channelLayout);
+         if (!mSwrCtx || swr_init(mSwrCtx) < 0) {
+ #endif
+             ALOGE("Cannot create sample rate converter for conversion "
+                     "of %d Hz %s %d channels to %d Hz %s %d channels!",
+                     mFrame->sample_rate,
+                     av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
+-                    av_frame_get_channels(mFrame),
++                    mFrame->ch_layout.nb_channels,
+                     mAudioTgtFreq,
+                     av_get_sample_fmt_name(mAudioTgtFmt),
+                     mAudioTgtChannels);
+@@ -1342,24 +1346,23 @@ int32_t SoftFFmpegAudio::resampleAudio() {
+ 
+         char src_layout_name[1024] = {0};
+         char tgt_layout_name[1024] = {0};
+-        av_get_channel_layout_string(src_layout_name, sizeof(src_layout_name),
+-                mCtx->channels, channelLayout);
+-        av_get_channel_layout_string(tgt_layout_name, sizeof(tgt_layout_name),
+-                mAudioTgtChannels, mAudioTgtChannelLayout);
++        av_channel_layout_describe(&mFrame->ch_layout,
++                src_layout_name, sizeof(src_layout_name));
++        av_channel_layout_describe(&channelLayout,
++                tgt_layout_name, sizeof(tgt_layout_name));
+         ALOGI("Create sample rate converter for conversion "
+                 "of %d Hz %s %d channels(%s) "
+                 "to %d Hz %s %d channels(%s)!",
+                 mFrame->sample_rate,
+                 av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
+-                av_frame_get_channels(mFrame),
++                mFrame->ch_layout.nb_channels,
+                 src_layout_name,
+                 mAudioTgtFreq,
+                 av_get_sample_fmt_name(mAudioTgtFmt),
+                 mAudioTgtChannels,
+                 tgt_layout_name);
+ 
+-        mAudioSrcChannelLayout = channelLayout;
+-        mAudioSrcChannels = av_frame_get_channels(mFrame);
++        mAudioSrcChannels = mFrame->ch_layout.nb_channels;
+         mAudioSrcFreq = mFrame->sample_rate;
+         mAudioSrcFmt = (enum AVSampleFormat)mFrame->format;
+         mReconfiguring = false;
+@@ -1394,7 +1397,7 @@ int32_t SoftFFmpegAudio::resampleAudio() {
+         ALOGV("ffmpeg audio decoder(resample), mFrame->nb_samples:%d, len2:%d, mResampledDataSize:%d, "
+                 "src channel:%u, src fmt:%s, tgt channel:%u, tgt fmt:%s",
+                 mFrame->nb_samples, len2, mResampledDataSize,
+-                av_frame_get_channels(mFrame),
++                mFrame->channels,
+                 av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
+                 mAudioTgtChannels,
+                 av_get_sample_fmt_name(mAudioTgtFmt));
+diff --git a/omx/SoftFFmpegAudio.h b/omx/SoftFFmpegAudio.h
+index 1ab8d72..c49b575 100644
+--- a/omx/SoftFFmpegAudio.h
++++ b/omx/SoftFFmpegAudio.h
+@@ -128,8 +128,6 @@ private:
+     uint32_t mAudioTgtFreq;
+     uint32_t mAudioSrcChannels;
+     uint32_t mAudioTgtChannels;
+-    int64_t mAudioSrcChannelLayout;
+-    int64_t mAudioTgtChannelLayout;
+     enum AVSampleFormat mAudioSrcFmt;
+     enum AVSampleFormat mAudioTgtFmt;
+ 
+diff --git a/omx/SoftFFmpegVideo.cpp b/omx/SoftFFmpegVideo.cpp
+index da6e6f3..d9f673a 100644
+--- a/omx/SoftFFmpegVideo.cpp
++++ b/omx/SoftFFmpegVideo.cpp
+@@ -103,7 +103,7 @@ SoftFFmpegVideo::~SoftFFmpegVideo() {
+     }
+ }
+ 
+-void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec) {
++void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec __unused) {
+     int fast = 1;
+ 
+     avctx->workaround_bugs   = 1;
+@@ -507,9 +507,23 @@ int32_t SoftFFmpegVideo::decodeVideo() {
+     }
+ 
+     initPacket(mPacket, inHeader);
+-    err = avcodec_decode_video2(mCtx, mFrame, &gotPic, mPacket);
++    err = avcodec_send_packet(mCtx, mPacket);
+     av_packet_unref(mPacket);
+ 
++    if (err < 0 && err != AVERROR(EAGAIN)) {
++        ALOGE("ffmpeg video decoder failed to send packet. (%d)", err);
++        // don't send error to OMXCodec, skip packet!
++    }
++
++    err = avcodec_receive_frame(mCtx, mFrame);
++
++    if (err == 0) {
++        gotPic = true;
++    } else if (err == AVERROR(EAGAIN)) {
++        gotPic = false;
++        err = 0;
++    }
++
+     if (err < 0) {
+         ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);
+         //don't send error to OMXCodec, skip!
+@@ -602,11 +616,11 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
+     //process timestamps
+ #ifndef LIBAV_CONFIG_H
+     if (decoder_reorder_pts == -1) {
+-        pts = av_frame_get_best_effort_timestamp(mFrame);
++        pts = mFrame->best_effort_timestamp;
+     } else
+ #endif
+     if (decoder_reorder_pts) {
+-        pts = mFrame->pkt_pts;
++        pts = mFrame->pts;
+     } else {
+         pts = mFrame->pkt_dts;
+     }
+diff --git a/omx/SoftFFmpegVideo.h b/omx/SoftFFmpegVideo.h
+index 255f86b..a931a22 100644
+--- a/omx/SoftFFmpegVideo.h
++++ b/omx/SoftFFmpegVideo.h
+@@ -110,7 +110,6 @@ private:
+     int32_t  openDecoder();
+     void     initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
+     int32_t  decodeVideo();
+-    int32_t  preProcessVideoFrame(AVPicture *picture, void **bufp);
+     int32_t  drainOneOutputBuffer();
+     void     drainEOSOutputBuffer();
+     void     drainAllOutputBuffers();
+diff --git a/utils/ffmpeg_cmdutils.c b/utils/ffmpeg_cmdutils.c
+index 8a03cd0..7d56dcb 100644
+--- a/utils/ffmpeg_cmdutils.c
++++ b/utils/ffmpeg_cmdutils.c
+@@ -4,6 +4,7 @@
+ #include "libavutil/eval.h"
+ #include "libavutil/log.h"
+ #include "libavutil/opt.h"
++#include "libavcodec/avcodec.h"
+ #include "libavformat/avformat.h"
+ 
+ /*
+@@ -61,8 +62,8 @@ AVDictionary *filter_codec_opts(AVDictionary *opts, enum AVCodecID codec_id,
+     const AVClass    *cc = avcodec_get_class();
+ 
+     if (!codec)
+-        codec            = s->oformat ? avcodec_find_encoder(codec_id)
+-                                      : avcodec_find_decoder(codec_id);
++        codec = (AVCodec*)(s->oformat ? avcodec_find_encoder(codec_id)
++                                      : avcodec_find_decoder(codec_id));
+ 
+     switch (st->codecpar->codec_type) {
+     case AVMEDIA_TYPE_VIDEO:
+diff --git a/utils/ffmpeg_source.cpp b/utils/ffmpeg_source.cpp
+index 379daab..3a2c931 100644
+--- a/utils/ffmpeg_source.cpp
++++ b/utils/ffmpeg_source.cpp
+@@ -17,16 +17,19 @@
+ #define LOG_TAG "FFMPEG"
+ #include <utils/Log.h>
+ 
++#include <inttypes.h>
+ #include <stdlib.h>
+ #include "ffmpeg_source.h"
+ 
+ #include <media/MediaExtractorPluginApi.h>
++#include <media/stagefright/DataSourceBase.h>
+ #include <media/stagefright/MediaErrors.h>
+ 
+ extern "C" {
+ 
+ #include "config.h"
+ #include "libavformat/url.h"
++#include "libavutil/error.h"
+ 
+ }
+ 
+@@ -35,7 +38,8 @@ namespace android {
+ class FFSource
+ {
+ public:
+-    void set(CDataSource *s) { mSource = s; }
++    void set(CDataSource *s);
++    void reset();
+     int init_check();
+     int read(unsigned char *buf, size_t size);
+     int64_t seek(int64_t pos);
+@@ -44,10 +48,27 @@ public:
+ protected:
+     CDataSource *mSource;
+     int64_t mOffset;
++    uint32_t mFlags;
+ };
+ 
++void FFSource::set(CDataSource *s)
++{
++    mSource = s;
++    mOffset = 0;
++    mFlags = s->flags(s->handle);
++
++    ALOGV("FFSource[%p]: flags=%08x", mSource, mFlags);
++}
++
++void FFSource::reset()
++{
++    ALOGV("FFSource[%p]: reset", mSource);
++    mSource = NULL;
++}
++
+ int FFSource::init_check()
+ {
++    ALOGV("FFSource[%p]: init_check", mSource);
+     return 0;
+ }
+ 
+@@ -56,13 +77,17 @@ int FFSource::read(unsigned char *buf, size_t size)
+     ssize_t n = 0;
+ 
+     n = mSource->readAt(mSource->handle, mOffset, buf, size);
+-    if (n == ERROR_END_OF_STREAM) {
++    if (n == ERROR_END_OF_STREAM ||
++            // For local file source, 0 bytes read means EOS.
++            (n == 0 && (mFlags & DataSourceBase::kIsLocalFileSource) != 0)) {
++        ALOGV("FFSource[%p]: end-of-stream", mSource);
+         return AVERROR_EOF;
+     } else if (n < 0) {
+-        ALOGE("FFSource readAt failed (%zd)", n);
++        ALOGE("FFSource[%p]: readAt failed (%zu)", mSource, n);
+         return n == UNKNOWN_ERROR ? AVERROR(errno) : n;
+     }
+     if (n > 0) {
++        ALOGV("FFsource[%p]: read = %zd", mSource, n);
+         mOffset += n;
+     }
+ 
+@@ -71,6 +96,7 @@ int FFSource::read(unsigned char *buf, size_t size)
+ 
+ int64_t FFSource::seek(int64_t pos)
+ {
++    ALOGV("FFSource[%p]: seek = %" PRId64, mSource, pos);
+     mOffset = pos;
+     return 0;
+ }
+@@ -80,9 +106,10 @@ off64_t FFSource::getSize()
+     off64_t sz = -1;
+ 
+     if (mSource->getSize(mSource->handle, &sz) != OK) {
+-         ALOGE("FFSource getSize failed");
++         ALOGE("FFSource[%p] getSize failed", mSource);
+          return AVERROR(errno);
+     }
++    ALOGV("FFsource[%p] size = %" PRId64, mSource, sz);
+ 
+     return sz;
+ }
+@@ -164,7 +191,7 @@ static int64_t android_seek(URLContext *h, int64_t pos, int whence)
+ static int android_close(URLContext *h)
+ {
+     ALOGV("android source close");
+-    reinterpret_cast<FFSource *>(h->priv_data)->set(NULL);
++    reinterpret_cast<FFSource *>(h->priv_data)->reset();
+     return 0;
+ }
+ 
+diff --git a/utils/ffmpeg_utils.cpp b/utils/ffmpeg_utils.cpp
+index f2e2bd3..957b589 100644
+--- a/utils/ffmpeg_utils.cpp
++++ b/utils/ffmpeg_utils.cpp
+@@ -152,22 +152,47 @@ const struct { const char *name; int level; } log_levels[] = {
+ // constructor and destructor
+ //////////////////////////////////////////////////////////////////////////////////
+ 
++static int parseLogLevel(const char* s) {
++    if (strcmp(s, "quiet") == 0)
++        return AV_LOG_QUIET;
++    else if (strcmp(s, "panic") == 0)
++        return AV_LOG_PANIC;
++    else if (strcmp(s, "fatal") == 0)
++        return AV_LOG_FATAL;
++    else if (strcmp(s, "error") == 0)
++        return AV_LOG_ERROR;
++    else if (strcmp(s, "warning") == 0)
++        return AV_LOG_WARNING;
++    else if (strcmp(s, "info") == 0)
++        return AV_LOG_INFO;
++    else if (strcmp(s, "verbose") == 0)
++        return AV_LOG_VERBOSE;
++    else if (strcmp(s, "debug") == 0)
++        return AV_LOG_DEBUG;
++    else if (strcmp(s, "trace") == 0)
++        return AV_LOG_TRACE;
++    else {
++        ALOGE("unsupported loglevel: %s", s);
++        return AV_LOG_INFO;
++    }
++}
++
+ /**
+- * To debug ffmpeg", type this command on the console before starting playback:
+- *     setprop debug.nam.ffmpeg 1
+- * To disable the debug, type:
+- *     setprop debug.nam.ffmpge 0
++ * To set ffmpeg log level, type this command on the console before starting playback:
++ *     setprop debug.ffmpeg.loglevel [quiet|panic|fatal|error|warning|info|verbose|debug|trace]
+ */
+ status_t initFFmpeg() 
+ {
+     status_t ret = OK;
++    char pval[PROPERTY_VALUE_MAX];
+ 
+     pthread_mutex_lock(&s_init_mutex);
+ 
+-    if (property_get_bool("debug.nam.ffmpeg", 0))
+-        av_log_set_level(AV_LOG_DEBUG);
+-    else
++    if (property_get("debug.ffmpeg.loglevel", pval, "info")) {
++        av_log_set_level(parseLogLevel(pval));
++    } else {
+         av_log_set_level(AV_LOG_INFO);
++    }
+ 
+     if(s_ref_count == 0) {
+         nam_av_log_set_flags(AV_LOG_SKIP_REPEATED);
+diff --git a/utils/ffmpeg_utils.h b/utils/ffmpeg_utils.h
+index 4ab16f0..308a4df 100644
+--- a/utils/ffmpeg_utils.h
++++ b/utils/ffmpeg_utils.h
+@@ -31,6 +31,7 @@ extern "C" {
+ #include "config.h"
+ #include "libavformat/avformat.h"
+ #include "libavcodec/avcodec.h"
++#include "libavcodec/bsf.h"
+ #include "libswscale/swscale.h"
+ #ifdef LIBAV_CONFIG_H
+ #include "libavresample/avresample.h"

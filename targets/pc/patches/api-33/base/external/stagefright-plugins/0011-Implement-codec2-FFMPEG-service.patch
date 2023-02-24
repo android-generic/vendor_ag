@@ -1,0 +1,3314 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Tue, 20 Sep 2022 19:00:27 +0200
+Subject: [PATCH 11/13] Implement codec2 FFMPEG service
+
+This provides the same functionalities as the OMX plugin, but using the
+newer codec2 foundations. The main differences are:
+- use a generic mechanism to pass extra information from extractor to
+  codecs, using a datastructure that is transfered as a plain buffer
+- support AV_CODEC_CAP_SUBFRAMES codecs (e.g. WMAPro), sending the
+  multiple frames generated with the same (cloned) worked and marking
+  the output buffers as incomplete
+---
+ codec2/Android.mk                             |  70 ++
+ codec2/C2FFMPEGAudioDecodeComponent.cpp       | 749 ++++++++++++++++++
+ codec2/C2FFMPEGAudioDecodeComponent.h         |  79 ++
+ codec2/C2FFMPEGAudioDecodeInterface.cpp       | 116 +++
+ codec2/C2FFMPEGAudioDecodeInterface.h         |  53 ++
+ codec2/C2FFMPEGCommon.h                       |  33 +
+ codec2/C2FFMPEGVideoDecodeComponent.cpp       | 699 ++++++++++++++++
+ codec2/C2FFMPEGVideoDecodeComponent.h         |  83 ++
+ codec2/C2FFMPEGVideoDecodeInterface.cpp       | 254 ++++++
+ codec2/C2FFMPEGVideoDecodeInterface.h         |  61 ++
+ ...id.hardware.media.c2@1.2-ffmpeg-service.rc |  22 +
+ codec2/manifest_media_c2_V1_2_ffmpeg.xml      |  26 +
+ codec2/media_codecs_ffmpeg_c2.xml             | 163 ++++
+ ...id.hardware.media.c2@1.2-ffmpeg-arm.policy |  86 ++
+ ....hardware.media.c2@1.2-ffmpeg-arm64.policy |  81 ++
+ ...id.hardware.media.c2@1.2-ffmpeg-x86.policy |  75 ++
+ ...hardware.media.c2@1.2-ffmpeg-x86_64.policy |  75 ++
+ codec2/service.cpp                            | 322 ++++++++
+ extractor/FFmpegExtractor.cpp                 |  19 +-
+ utils/codec_utils.h                           |  11 +
+ utils/ffmpeg_source.cpp                       |   1 +
+ utils/ffmpeg_utils.h                          |   1 +
+ 22 files changed, 3077 insertions(+), 2 deletions(-)
+ create mode 100644 codec2/Android.mk
+ create mode 100644 codec2/C2FFMPEGAudioDecodeComponent.cpp
+ create mode 100644 codec2/C2FFMPEGAudioDecodeComponent.h
+ create mode 100644 codec2/C2FFMPEGAudioDecodeInterface.cpp
+ create mode 100644 codec2/C2FFMPEGAudioDecodeInterface.h
+ create mode 100644 codec2/C2FFMPEGCommon.h
+ create mode 100644 codec2/C2FFMPEGVideoDecodeComponent.cpp
+ create mode 100644 codec2/C2FFMPEGVideoDecodeComponent.h
+ create mode 100644 codec2/C2FFMPEGVideoDecodeInterface.cpp
+ create mode 100644 codec2/C2FFMPEGVideoDecodeInterface.h
+ create mode 100644 codec2/android.hardware.media.c2@1.2-ffmpeg-service.rc
+ create mode 100644 codec2/manifest_media_c2_V1_2_ffmpeg.xml
+ create mode 100644 codec2/media_codecs_ffmpeg_c2.xml
+ create mode 100644 codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm.policy
+ create mode 100644 codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm64.policy
+ create mode 100644 codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86.policy
+ create mode 100644 codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86_64.policy
+ create mode 100644 codec2/service.cpp
+
+diff --git a/codec2/Android.mk b/codec2/Android.mk
+new file mode 100644
+index 0000000..d0c4207
+--- /dev/null
++++ b/codec2/Android.mk
+@@ -0,0 +1,70 @@
++#
++# Copyright (C) 2022 Michael Goffioul <michael.goffioul@gmail.com>
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++
++LOCAL_PATH := $(call my-dir)
++
++include $(CLEAR_VARS)
++include $(SF_COMMON_MK)
++LOCAL_MODULE := android.hardware.media.c2@1.2-ffmpeg-service
++LOCAL_MODULE_RELATIVE_PATH := hw
++LOCAL_VINTF_FRAGMENTS := manifest_media_c2_V1_2_ffmpeg.xml
++LOCAL_INIT_RC := android.hardware.media.c2@1.2-ffmpeg-service.rc
++LOCAL_REQUIRED_MODULES := \
++	android.hardware.media.c2@1.2-ffmpeg.policy \
++	media_codecs_ffmpeg_c2.xml
++LOCAL_SRC_FILES := \
++	C2FFMPEGAudioDecodeComponent.cpp \
++	C2FFMPEGAudioDecodeInterface.cpp \
++	C2FFMPEGVideoDecodeComponent.cpp \
++	C2FFMPEGVideoDecodeInterface.cpp \
++	service.cpp
++LOCAL_SHARED_LIBRARIES := \
++	android.hardware.media.c2@1.2 \
++	libavcodec \
++	libavutil \
++	libavservices_minijail \
++	libbase \
++	libbinder \
++	libcodec2_hidl@1.2 \
++	libcodec2_soft_common \
++	libcodec2_vndk \
++	libffmpeg_utils \
++	libhidlbase \
++	liblog \
++	libstagefright_foundation \
++	libswresample \
++	libswscale \
++	libutils
++include $(BUILD_EXECUTABLE)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := android.hardware.media.c2@1.2-ffmpeg.policy
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := ETC
++LOCAL_PROPRIETARY_MODULE := true
++LOCAL_MODULE_RELATIVE_PATH := seccomp_policy
++LOCAL_SRC_FILES_x86 := seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86.policy
++LOCAL_SRC_FILES_x86_64 := seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86_64.policy
++LOCAL_SRC_FILES_arm := seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm.policy
++LOCAL_SRC_FILES_arm64 := seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm64.policy
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := media_codecs_ffmpeg_c2.xml
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := ETC
++LOCAL_SRC_FILES := media_codecs_ffmpeg_c2.xml
++include $(BUILD_PREBUILT)
+diff --git a/codec2/C2FFMPEGAudioDecodeComponent.cpp b/codec2/C2FFMPEGAudioDecodeComponent.cpp
+new file mode 100644
+index 0000000..62b52b1
+--- /dev/null
++++ b/codec2/C2FFMPEGAudioDecodeComponent.cpp
+@@ -0,0 +1,749 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define LOG_TAG "C2FFMPEGAudioDecodeComponent"
++#include <android-base/stringprintf.h>
++#include <log/log.h>
++
++#include <SimpleC2Interface.h>
++#include "C2FFMPEGAudioDecodeComponent.h"
++#include <libswresample/swresample_internal.h>
++
++#define DEBUG_FRAMES 0
++#define DEBUG_EXTRADATA 0
++
++namespace android {
++
++static enum AVSampleFormat convertFormatToFFMPEG(C2Config::pcm_encoding_t encoding) {
++    switch (encoding) {
++        case C2Config::PCM_8: return AV_SAMPLE_FMT_U8;
++        case C2Config::PCM_16: return AV_SAMPLE_FMT_S16;
++        case C2Config::PCM_32: return AV_SAMPLE_FMT_S32;
++        case C2Config::PCM_FLOAT: return AV_SAMPLE_FMT_FLT;
++        default: return AV_SAMPLE_FMT_NONE;
++    }
++}
++
++__unused
++static C2Config::pcm_encoding_t convertFormatToC2(enum AVSampleFormat format) {
++    switch (format) {
++        case AV_SAMPLE_FMT_U8: return C2Config::PCM_8;
++        case AV_SAMPLE_FMT_S16: return C2Config::PCM_16;
++        case AV_SAMPLE_FMT_S32: return C2Config::PCM_32;
++        case AV_SAMPLE_FMT_FLT: return C2Config::PCM_FLOAT;
++        default: return C2Config::PCM_16;
++    }
++}
++
++// Helper structures to encapsulate the specific codec behaviors.
++// Currently only used to process extradata.
++
++struct CodecHelper {
++    virtual ~CodecHelper() {}
++    virtual c2_status_t onCodecConfig(AVCodecContext* mCtx, C2ReadView* inBuffer);
++    virtual c2_status_t onOpen(AVCodecContext* mCtx);
++    virtual c2_status_t onOpened(AVCodecContext* mCtx);
++};
++
++c2_status_t CodecHelper::onCodecConfig(AVCodecContext* mCtx, C2ReadView* inBuffer) {
++    int orig_extradata_size = mCtx->extradata_size;
++    int add_extradata_size = inBuffer->capacity();
++
++#if DEBUG_EXTRADATA
++    ALOGD("CodecHelper::onCodecConfig: add = %u, current = %d", add_extradata_size, orig_extradata_size);
++#endif
++    mCtx->extradata_size += add_extradata_size;
++    mCtx->extradata = (uint8_t *) realloc(mCtx->extradata, mCtx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
++    if (! mCtx->extradata) {
++        ALOGE("CodecHelper::onCodecConfig: ffmpeg audio decoder failed to alloc extradata memory.");
++        return C2_NO_MEMORY;
++    }
++    memcpy(mCtx->extradata + orig_extradata_size, inBuffer->data(), add_extradata_size);
++    memset(mCtx->extradata + mCtx->extradata_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++
++    return C2_OK;
++}
++
++c2_status_t CodecHelper::onOpen(AVCodecContext* mCtx) {
++#if DEBUG_EXTRADATA
++    ALOGD("CodecHelper::onOpen: extradata = %d", mCtx->extradata_size);
++#else
++    // Silence compilation warning.
++    (void)mCtx;
++#endif
++    return C2_OK;
++}
++
++c2_status_t CodecHelper::onOpened(AVCodecContext* mCtx) {
++    (void)mCtx;
++    return C2_OK;
++}
++
++struct VorbisCodecHelper : public CodecHelper {
++    VorbisCodecHelper();
++    ~VorbisCodecHelper();
++    c2_status_t onCodecConfig(AVCodecContext* mCtx, C2ReadView* rView);
++    c2_status_t onOpen(AVCodecContext* mCtx);
++
++    uint8_t* mHeader[3];
++    int mHeaderLen[3];
++};
++
++VorbisCodecHelper::VorbisCodecHelper()
++     : CodecHelper(),
++       mHeader{ NULL, NULL, NULL },
++       mHeaderLen{ 0, 0, 0 } {
++}
++
++VorbisCodecHelper::~VorbisCodecHelper() {
++    for (int i = 0; i < 3; i++) {
++        if (mHeader[i]) {
++            av_free(mHeader[i]);
++            mHeader[i] = NULL;
++        }
++        mHeaderLen[i] = 0;
++    }
++}
++
++c2_status_t VorbisCodecHelper::onCodecConfig(AVCodecContext* mCtx __unused, C2ReadView* inBuffer) {
++    const uint8_t* data = inBuffer->data();
++    int len = inBuffer->capacity();
++    int index = 0;
++
++    switch (data[0]) {
++        case 1: index = 0; break;
++        case 3: index = 1; break;
++        case 5: index = 2; break;
++        default:
++            ALOGE("VorbisCodecHelper::onCodecConfig: invalid vorbis codec config (%02x)", data[0]);
++            return C2_BAD_VALUE;
++    }
++
++    if (mHeader[index]) {
++        ALOGW("VorbisCodecHelper::onCodecConfig: overwriting header[%d]", index);
++        av_free(mHeader[index]);
++    }
++    mHeader[index] = (uint8_t*)av_mallocz(len);
++    if (! mHeader[index]) {
++        ALOGE("VorbisCodecHelper::onCodecConfig: oom for vorbis extradata");
++        return C2_NO_MEMORY;
++    }
++    memcpy(mHeader[index], data, len);
++    mHeaderLen[index] = len;
++
++#if DEBUG_EXTRADATA
++    ALOGD("VorbisCodecHelper::onCodecConfig: found header[%d] = %d", index, len);
++#endif
++
++    return C2_OK;
++}
++
++c2_status_t VorbisCodecHelper::onOpen(AVCodecContext* mCtx) {
++    // Don't generate extradata twice
++    if (! mCtx->extradata) {
++        if (! setup_vorbis_extradata(&mCtx->extradata,
++                                     &mCtx->extradata_size,
++                                     (const uint8_t**)mHeader,
++                                     mHeaderLen)) {
++            return C2_NO_MEMORY;
++        }
++#if DEBUG_EXTRADATA
++        ALOGD("VorbisCodecHelper::onOpen: extradata = %d", mCtx->extradata_size);
++#endif
++    }
++    return C2_OK;
++}
++
++struct Ac3CodecHelper : public CodecHelper {
++    c2_status_t onOpened(AVCodecContext* mCtx);
++};
++
++c2_status_t Ac3CodecHelper::onOpened(AVCodecContext* mCtx) {
++    int err = av_opt_set_chlayout(mCtx->priv_data, "downmix", &mCtx->ch_layout, 0);
++    if (err < 0) {
++        ALOGE("Ac3CodecHelper::onOpened: failed to set downmix = %d: %s (%08x)",
++              mCtx->ch_layout.nb_channels, av_err2str(err), err);
++    } else {
++        ALOGD("Ac3CodecHelper::onOpened: set downmix = %d", mCtx->ch_layout.nb_channels);
++    }
++    return C2_OK;
++}
++
++CodecHelper* createCodecHelper(enum AVCodecID codec_id) {
++    switch (codec_id) {
++        case AV_CODEC_ID_AC3:
++        case AV_CODEC_ID_EAC3:
++            return new Ac3CodecHelper();
++        case AV_CODEC_ID_VORBIS:
++            return new VorbisCodecHelper();
++        default:
++            return new CodecHelper();
++    }
++}
++
++C2FFMPEGAudioDecodeComponent::C2FFMPEGAudioDecodeComponent(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2FFMPEGAudioDecodeInterface>& intf)
++    : SimpleC2Component(std::make_shared<SimpleInterface<C2FFMPEGAudioDecodeInterface>>(componentInfo->name, 0, intf)),
++      mInfo(componentInfo),
++      mIntf(intf),
++      mCodecID(componentInfo->codecID),
++      mCtx(NULL),
++      mFrame(NULL),
++      mPacket(NULL),
++      mFFMPEGInitialized(false),
++      mCodecAlreadyOpened(false),
++      mEOSSignalled(false),
++      mSwrCtx(NULL),
++      mTargetSampleFormat(AV_SAMPLE_FMT_NONE),
++      mTargetSampleRate(44100),
++      mTargetChannels(1) {
++    ALOGD("C2FFMPEGAudioDecodeComponent: mediaType = %s", componentInfo->mediaType);
++}
++
++C2FFMPEGAudioDecodeComponent::~C2FFMPEGAudioDecodeComponent() {
++    ALOGD("~C2FFMPEGAudioDecodeComponent: mCtx = %p", mCtx);
++    onRelease();
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::initDecoder() {
++    if (! mFFMPEGInitialized) {
++        if (initFFmpeg() != C2_OK) {
++            ALOGE("initDecoder: FFMPEG initialization failed.");
++            return C2_NO_INIT;
++        }
++        mFFMPEGInitialized = true;
++    }
++
++    mCtx = avcodec_alloc_context3(NULL);
++    if (! mCtx) {
++        ALOGE("initDecoder: avcodec_alloc_context failed.");
++        return C2_NO_MEMORY;
++    }
++
++    mCtx->codec_type = AVMEDIA_TYPE_AUDIO;
++    mCtx->codec_id = mCodecID;
++
++    updateAudioParameters();
++
++    av_channel_layout_default(&mCtx->ch_layout, mTargetChannels);
++    mCtx->sample_rate = mTargetSampleRate;
++    mCtx->bit_rate = 0;
++    mCtx->sample_fmt = mTargetSampleFormat;
++
++    // Avoid resampling if possible, ask the codec for the target format.
++    mCtx->request_sample_fmt = mCtx->sample_fmt;
++
++    const FFMPEGAudioCodecInfo* codecInfo = mIntf->getCodecInfo();
++
++    if (codecInfo) {
++        ALOGD("initDecoder: use codec info from extractor");
++        mCtx->codec_id = (enum AVCodecID)codecInfo->codec_id;
++        mCtx->bit_rate = mIntf->getBitrate(); // The extractor always sets bitrate
++        mCtx->bits_per_coded_sample = codecInfo->bits_per_coded_sample;
++        mCtx->block_align = codecInfo->block_align;
++        // FIXME: Is more needed...?
++    }
++
++    mCodecHelper = createCodecHelper(mCtx->codec_id);
++
++    ALOGD("initDecoder: %p [%s], %s - sr=%d, ch=%d, fmt=%s",
++          mCtx, avcodec_get_name(mCtx->codec_id), mInfo->mediaType,
++          mCtx->sample_rate, mCtx->ch_layout.nb_channels, av_get_sample_fmt_name(mCtx->sample_fmt));
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::openDecoder() {
++    if (mCodecAlreadyOpened) {
++        return C2_OK;
++    }
++
++    mCodecHelper->onOpen(mCtx);
++
++    // Find decoder
++    mCtx->codec = avcodec_find_decoder(mCtx->codec_id);
++    if (! mCtx->codec) {
++        ALOGE("openDecoder: ffmpeg audio decoder failed to find codec %d", mCtx->codec_id);
++        return C2_NOT_FOUND;
++    }
++
++    // Configure decoder
++    mCtx->workaround_bugs   = 1;
++    mCtx->idct_algo         = 0;
++    mCtx->skip_frame        = AVDISCARD_DEFAULT;
++    mCtx->skip_idct         = AVDISCARD_DEFAULT;
++    mCtx->skip_loop_filter  = AVDISCARD_DEFAULT;
++    mCtx->error_concealment = 3;
++
++    mCtx->flags |= AV_CODEC_FLAG_BITEXACT;
++
++    ALOGD("openDecoder: begin to open ffmpeg audio decoder(%s), mCtx sample_rate: %d, channels: %d",
++           avcodec_get_name(mCtx->codec_id), mCtx->sample_rate, mCtx->ch_layout.nb_channels);
++
++    int err = avcodec_open2(mCtx, mCtx->codec, NULL);
++    if (err < 0) {
++        ALOGE("openDecoder: ffmpeg audio decoder failed to initialize.(%s)", av_err2str(err));
++        return C2_NO_INIT;
++    }
++    mCodecAlreadyOpened = true;
++
++    mCodecHelper->onOpened(mCtx);
++
++    ALOGD("openDecoder: open ffmpeg audio decoder(%s) success, mCtx sample_rate: %d, "
++          "channels: %d, sample_fmt: %s, bits_per_coded_sample: %d, bits_per_raw_sample: %d",
++          avcodec_get_name(mCtx->codec_id),
++          mCtx->sample_rate, mCtx->ch_layout.nb_channels,
++          av_get_sample_fmt_name(mCtx->sample_fmt),
++          mCtx->bits_per_coded_sample, mCtx->bits_per_raw_sample);
++
++    mFrame = av_frame_alloc();
++    if (! mFrame) {
++        ALOGE("openDecoder: oom for audio frame");
++        return C2_NO_MEMORY;
++    }
++
++    return C2_OK;
++}
++
++void C2FFMPEGAudioDecodeComponent::deInitDecoder() {
++    ALOGD("deInitDecoder: %p", mCtx);
++    if (mCtx) {
++        if (avcodec_is_open(mCtx)) {
++            avcodec_flush_buffers(mCtx);
++        }
++        if (mCtx->extradata) {
++            av_free(mCtx->extradata);
++            mCtx->extradata = NULL;
++            mCtx->extradata_size = 0;
++        }
++        if (mCodecAlreadyOpened) {
++            avcodec_close(mCtx);
++            mCodecAlreadyOpened = false;
++        }
++        av_freep(&mCtx);
++    }
++    if (mFrame) {
++        av_frame_free(&mFrame);
++        mFrame = NULL;
++    }
++    if (mPacket) {
++        av_packet_free(&mPacket);
++        mPacket = NULL;
++    }
++    if (mSwrCtx) {
++        swr_free(&mSwrCtx);
++    }
++    if (mCodecHelper) {
++        delete mCodecHelper;
++        mCodecHelper = NULL;
++    }
++    mEOSSignalled = false;
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::processCodecConfig(C2ReadView* inBuffer) {
++#if DEBUG_EXTRADATA
++    ALOGD("processCodecConfig: inBuffer = %d", inBuffer->capacity());
++#endif
++    if (! mCodecAlreadyOpened) {
++        return mCodecHelper->onCodecConfig(mCtx, inBuffer);
++    } else {
++        ALOGW("processCodecConfig: decoder is already opened, ignoring %d bytes", inBuffer->capacity());
++    }
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::sendInputBuffer(
++        C2ReadView *inBuffer, int64_t timestamp) {
++    if (!mPacket) {
++        mPacket = av_packet_alloc();
++        if (!mPacket) {
++            ALOGE("sendInputBuffer: oom for audio packet");
++            return C2_NO_MEMORY;
++        }
++    }
++
++    mPacket->data = inBuffer ? const_cast<uint8_t *>(inBuffer->data()) : NULL;
++    mPacket->size = inBuffer ? inBuffer->capacity() : 0;
++    mPacket->pts = timestamp;
++    mPacket->dts = timestamp;
++
++    int err = avcodec_send_packet(mCtx, mPacket);
++    av_packet_unref(mPacket);
++
++    if (err < 0) {
++        ALOGE("sendInputBuffer: failed to send data to decoder err = %d", err);
++        // Don't report error to client.
++    }
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::receiveFrame(bool* hasFrame) {
++    int err = avcodec_receive_frame(mCtx, mFrame);
++
++    if (err == 0) {
++        *hasFrame = true;
++    } else if (err == AVERROR(EAGAIN) || err == AVERROR_EOF) {
++        *hasFrame = false;
++    } else {
++        ALOGE("receiveFrame: failed to receive frame from decoder err = %d", err);
++        // Don't report error to client.
++    }
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::getOutputBuffer(C2WriteView* outBuffer) {
++    if (! mSwrCtx ||
++        mSwrCtx->in_sample_fmt != mFrame->format ||
++        mSwrCtx->in_sample_rate != mFrame->sample_rate ||
++        av_channel_layout_compare(&mSwrCtx->in_ch_layout, &mFrame->ch_layout) != 0 ||
++        mSwrCtx->out_sample_fmt != mTargetSampleFormat ||
++        mSwrCtx->out_sample_rate != mTargetSampleRate ||
++        mSwrCtx->out_ch_layout.nb_channels != mTargetChannels) {
++        if (mSwrCtx) {
++            swr_free(&mSwrCtx);
++        }
++
++        AVChannelLayout newLayout;
++
++        av_channel_layout_default(&newLayout, mTargetChannels);
++        swr_alloc_set_opts2(&mSwrCtx,
++                            &newLayout, mTargetSampleFormat, mTargetSampleRate,
++                            &mFrame->ch_layout, (enum AVSampleFormat)mFrame->format, mFrame->sample_rate,
++                            0, NULL);
++        av_channel_layout_uninit(&newLayout);
++        if (! mSwrCtx || swr_init(mSwrCtx) < 0) {
++            ALOGE("getOutputBuffer: cannot create audio converter - sr=%d, ch=%d, fmt=%s => sr=%d, ch=%d, fmt=%s",
++                  mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
++                  mTargetSampleRate, mTargetChannels, av_get_sample_fmt_name(mTargetSampleFormat));
++            if (mSwrCtx) {
++                swr_free(&mSwrCtx);
++            }
++            return C2_NO_MEMORY;
++        }
++
++        ALOGD("getOutputBuffer: created audio converter - sr=%d, ch=%d, fmt=%s => sr=%d, ch=%d, fmt=%s",
++              mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
++              mTargetSampleRate, mTargetChannels, av_get_sample_fmt_name(mTargetSampleFormat));
++    }
++
++    uint8_t* out[1] = { outBuffer->data() };
++    int ret = swr_convert(mSwrCtx, out, mFrame->nb_samples, (const uint8_t**)mFrame->extended_data, mFrame->nb_samples);
++
++    if (ret < 0) {
++        ALOGE("getOutputBuffer: audio conversion failed");
++        return C2_CORRUPTED;
++    } else if (ret != mFrame->nb_samples) {
++        ALOGW("getOutputBuffer: audio conversion truncated!");
++    }
++
++#if DEBUG_FRAMES
++    ALOGD("getOutputBuffer: audio converted - sr=%d, ch=%d, fmt=%s, #=%d => sr=%d, ch=%d, fmt=%s, #=%d(%d)",
++          mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format), mFrame->nb_samples,
++          mTargetSampleRate, mTargetChannels, av_get_sample_fmt_name(mTargetSampleFormat), mFrame->nb_samples, outBuffer->capacity());
++#endif
++
++    return C2_OK;
++} 
++
++void C2FFMPEGAudioDecodeComponent::updateAudioParameters() {
++    mTargetSampleFormat = convertFormatToFFMPEG(mIntf->getPcmEncodingInfo());
++    mTargetSampleRate = mIntf->getSampleRate();
++    mTargetChannels = mIntf->getChannelCount();
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::onInit() {
++    ALOGD("onInit");
++    return initDecoder();
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::onStop() {
++    ALOGD("onStop");
++    return C2_OK;
++}
++
++void C2FFMPEGAudioDecodeComponent::onReset() {
++    ALOGD("onReset");
++    deInitDecoder();
++    initDecoder();
++}
++
++void C2FFMPEGAudioDecodeComponent::onRelease() {
++    ALOGD("onRelease");
++    deInitDecoder();
++    if (mFFMPEGInitialized) {
++        deInitFFmpeg();
++        mFFMPEGInitialized = false;
++    }
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::onFlush_sm() {
++    ALOGD("onFlush_sm");
++    if (mCtx && avcodec_is_open(mCtx)) {
++        // Make sure that the next buffer output does not still
++        // depend on fragments from the last one decoded.
++        avcodec_flush_buffers(mCtx);
++        mEOSSignalled = false;
++    }
++    return C2_OK;
++}
++
++void C2FFMPEGAudioDecodeComponent::process(
++    const std::unique_ptr<C2Work> &work,
++    const std::shared_ptr<C2BlockPool>& pool
++) {
++    size_t inSize = 0u;
++    bool eos = (work->input.flags & C2FrameData::FLAG_END_OF_STREAM);
++    C2ReadView rView = mDummyReadView;
++    bool hasInputBuffer = false;
++    bool hasFrame = false;
++
++    if (! work->input.buffers.empty()) {
++        rView = work->input.buffers[0]->data().linearBlocks().front().map().get();
++        inSize = rView.capacity();
++        hasInputBuffer = true;
++    }
++
++#if DEBUG_FRAMES
++    ALOGD("process: input flags=%08x ts=%lu idx=%lu #buf=%lu[%lu] #conf=%lu #info=%lu",
++          work->input.flags, work->input.ordinal.timestamp.peeku(), work->input.ordinal.frameIndex.peeku(),
++          work->input.buffers.size(), inSize, work->input.configUpdate.size(), work->input.infoBuffers.size());
++#endif
++
++    if (mEOSSignalled) {
++        ALOGE("process: ignoring work while EOS reached");
++        work->workletsProcessed = 0u;
++        work->result = C2_BAD_VALUE;
++        return;
++    }
++
++    if (hasInputBuffer && rView.error()) {
++        ALOGE("process: read view map failed err = %d", rView.error());
++        work->workletsProcessed = 0u;
++        work->result = rView.error();
++        return;
++    }
++
++    // In all cases the work is marked as completed.
++    // NOTE: This has an impact on the drain operation.
++
++    work->result = C2_OK;
++    work->worklets.front()->output.flags = (C2FrameData::flags_t)0;
++    work->worklets.front()->output.buffers.clear();
++    work->worklets.front()->output.ordinal = work->input.ordinal;
++    work->workletsProcessed = 1u;
++
++    if (inSize || (eos && mCodecAlreadyOpened)) {
++        c2_status_t err = C2_OK;
++
++        if (work->input.flags & C2FrameData::FLAG_CODEC_CONFIG) {
++            work->result = processCodecConfig(&rView);
++            return;
++        }
++
++        if (! mCodecAlreadyOpened) {
++            err = openDecoder();
++            if (err != C2_OK) {
++                work->result = err;
++                return;
++            }
++        }
++
++        err = sendInputBuffer(&rView, work->input.ordinal.timestamp.peekll());
++        if (err != C2_OK) {
++            work->result = err;
++            return;
++        }
++
++        while (true) {
++            hasFrame = false;
++            err = receiveFrame(&hasFrame);
++            if (err != C2_OK) {
++                work->result = err;
++                return;
++            }
++
++            if (! hasFrame) {
++                break;
++            }
++
++#if DEBUG_FRAMES
++            ALOGD("process: got frame pts=%" PRId64 " dts=%" PRId64 " ts=%" PRId64 " - sr=%d, ch=%d, fmt=%s, #=%d",
++                  mFrame->pts, mFrame->pkt_dts, mFrame->best_effort_timestamp,
++                  mFrame->sample_rate, mFrame->channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
++                  mFrame->nb_samples);
++#endif
++            // Always target the sample format on output port. Even if we can trigger a config update
++            // for the sample format, Android does not support planar formats, so if the codec uses
++            // such format (e.g. AC3), conversion is needed. Technically we can limit the conversion to
++            // planer->packed, but that means Android would also do its own conversion to the wanted
++            // format on output port. To avoid double conversion, target directly the wanted format.
++
++            bool needConfigUpdate = (mFrame->sample_rate != mTargetSampleRate ||
++                                     mFrame->ch_layout.nb_channels != mTargetChannels);
++            bool needResampling = (needConfigUpdate ||
++                                   mFrame->format != mTargetSampleFormat ||
++                                   // We only support sending audio data to Android in native order.
++                                   mFrame->ch_layout.order != AV_CHANNEL_ORDER_NATIVE);
++
++            if (needConfigUpdate) {
++                ALOGD("process: audio params changed - sr=%d, ch=%d, fmt=%s => sr=%d, ch=%d, fmt=%s",
++                      mTargetSampleRate, mTargetChannels, av_get_sample_fmt_name(mTargetSampleFormat),
++                      mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name(mTargetSampleFormat));
++
++                if (work->worklets.front()->output.buffers.size() > 0) {
++                    // Not sure if this would ever happen, nor how to handle it...
++                    ALOGW("process: audio params changed with non empty output buffers pending");
++                }
++
++                C2StreamSampleRateInfo::output sampleRate(0u, mFrame->sample_rate);
++                C2StreamChannelCountInfo::output channelCount(0u, mFrame->ch_layout.nb_channels);
++                std::vector<std::unique_ptr<C2SettingResult>> failures;
++
++                err = mIntf->config({ &sampleRate, &channelCount }, C2_MAY_BLOCK, &failures);
++                if (err == C2_OK) {
++                    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(sampleRate));
++                    work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(channelCount));
++                    updateAudioParameters();
++                } else {
++                    ALOGE("process: config update failed err = %d", err);
++                    work->result = C2_CORRUPTED;
++                    return;
++                }
++            }
++
++            std::shared_ptr<C2LinearBlock> block;
++            int len = av_samples_get_buffer_size(NULL, mTargetChannels, mFrame->nb_samples, mTargetSampleFormat, 0);
++
++            err = pool->fetchLinearBlock(len, { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
++            if (err != C2_OK) {
++                ALOGE("process: failed to fetch linear block for #=%d err = %d",
++                      mFrame->nb_samples, err);
++                work->result = C2_CORRUPTED;
++                return;
++            }
++
++            C2WriteView wView = block->map().get();
++
++            err = wView.error();
++            if (err != C2_OK) {
++                ALOGE("process: write view map failed err = %d", err);
++                work->result = C2_CORRUPTED;
++                return;
++            }
++
++            if (needResampling) {
++                err = getOutputBuffer(&wView);
++                if (err != C2_OK) {
++                    work->result = err;
++                    return;
++                }
++            }
++            else {
++#if DEBUG_FRAMES
++                ALOGD("process: no audio conversion needed");
++#endif
++                memcpy(wView.data(), mFrame->data[0], mFrame->linesize[0]);
++            }
++
++            std::shared_ptr<C2Buffer> buffer = createLinearBuffer(std::move(block), 0, len);
++
++            if (mCtx->codec->capabilities & AV_CODEC_CAP_SUBFRAMES) {
++                auto fillWork = [buffer, &work, this](const std::unique_ptr<C2Work>& clone) {
++                    clone->worklets.front()->output.configUpdate = std::move(work->worklets.front()->output.configUpdate);
++                    clone->worklets.front()->output.buffers.clear();
++                    clone->worklets.front()->output.buffers.push_back(buffer);
++                    clone->worklets.front()->output.ordinal = clone->input.ordinal;
++                    if (mFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
++                        work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
++                    }
++                    clone->worklets.front()->output.flags = C2FrameData::FLAG_INCOMPLETE;
++                    clone->workletsProcessed = 1u;
++                    clone->result = C2_OK;
++                };
++
++#if DEBUG_FRAMES
++                ALOGD("process: send subframe buffer ts=%" PRIu64 " idx=%" PRIu64,
++                      work->input.ordinal.timestamp.peeku(), work->input.ordinal.frameIndex.peeku());
++#endif
++                cloneAndSend(work->input.ordinal.frameIndex.peeku(), work, fillWork);
++            }
++            else {
++                work->worklets.front()->output.buffers.push_back(buffer);
++                if (mFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
++                    work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
++                }
++                break;
++            }
++        }
++    }
++#if DEBUG_FRAMES
++    else {
++        ALOGW("process: ignoring empty work");
++    }
++#endif
++
++    if (eos) {
++        mEOSSignalled = true;
++        work->worklets.front()->output.flags = C2FrameData::FLAG_END_OF_STREAM;
++    }
++}
++
++c2_status_t C2FFMPEGAudioDecodeComponent::drain(
++    uint32_t drainMode,
++    const std::shared_ptr<C2BlockPool>& /* pool */
++) {
++    ALOGD("drain: mode = %u", drainMode);
++
++    if (drainMode == NO_DRAIN) {
++        ALOGW("drain: NO_DRAIN is no-op");
++        return C2_OK;
++    }
++    if (drainMode == DRAIN_CHAIN) {
++        ALOGW("drain: DRAIN_CHAIN not supported");
++        return C2_OMITTED;
++    }
++    if (! mCodecAlreadyOpened) {
++        ALOGW("drain: codec not opened yet");
++        return C2_OK;
++    }
++
++    bool hasFrame = false;
++    c2_status_t err = C2_OK;
++
++    while (err == C2_OK) {
++        hasFrame = false;
++        err = sendInputBuffer(NULL, 0);
++        if (err == C2_OK) {
++            err = receiveFrame(&hasFrame);
++            if (hasFrame) {
++                ALOGW("drain: skip frame pts=%" PRId64 " dts=%" PRId64 " ts=%" PRId64 " - sr=%d, ch=%d, fmt=%s, #=%d",
++                      mFrame->pts, mFrame->pkt_dts, mFrame->best_effort_timestamp,
++                      mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
++                      mFrame->nb_samples);
++            } else {
++                err = C2_NOT_FOUND;
++            }
++        }
++    }
++
++    return C2_OK;
++}
++
++} // namespace android
+diff --git a/codec2/C2FFMPEGAudioDecodeComponent.h b/codec2/C2FFMPEGAudioDecodeComponent.h
+new file mode 100644
+index 0000000..a737209
+--- /dev/null
++++ b/codec2/C2FFMPEGAudioDecodeComponent.h
+@@ -0,0 +1,79 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef C2_FFMPEG_AUDIO_DECODE_COMPONENT_H
++#define C2_FFMPEG_AUDIO_DECODE_COMPONENT_H
++
++#include <SimpleC2Component.h>
++#include "C2FFMPEGCommon.h"
++#include "C2FFMPEGAudioDecodeInterface.h"
++
++namespace android {
++
++struct CodecHelper;
++
++class C2FFMPEGAudioDecodeComponent : public SimpleC2Component {
++public:
++    explicit C2FFMPEGAudioDecodeComponent(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2FFMPEGAudioDecodeInterface>& intf);
++    virtual ~C2FFMPEGAudioDecodeComponent();
++
++protected:
++    c2_status_t onInit() override;
++    c2_status_t onStop() override;
++    void onReset() override;
++    void onRelease() override;
++    c2_status_t onFlush_sm() override;
++    void process(
++        const std::unique_ptr<C2Work> &work,
++        const std::shared_ptr<C2BlockPool> &pool) override;
++    c2_status_t drain(
++        uint32_t drainMode,
++        const std::shared_ptr<C2BlockPool> &pool) override;
++
++private:
++    c2_status_t initDecoder();
++    c2_status_t openDecoder();
++    void deInitDecoder();
++    c2_status_t processCodecConfig(C2ReadView* inBuffer);
++    c2_status_t sendInputBuffer(C2ReadView* inBuffer, int64_t timestamp);
++    c2_status_t receiveFrame(bool* hasFrame);
++    c2_status_t getOutputBuffer(C2WriteView* outBuffer);
++    void updateAudioParameters();
++
++private:
++    const C2FFMPEGComponentInfo* mInfo;
++    std::shared_ptr<C2FFMPEGAudioDecodeInterface> mIntf;
++    enum AVCodecID mCodecID;
++    AVCodecContext* mCtx;
++    AVFrame* mFrame;
++    AVPacket* mPacket;
++    bool mFFMPEGInitialized;
++    bool mCodecAlreadyOpened;
++    bool mEOSSignalled;
++    // Audio resampling
++    struct SwrContext* mSwrCtx;
++    enum AVSampleFormat mTargetSampleFormat;
++    int mTargetSampleRate;
++    int mTargetChannels;
++    // Misc
++    CodecHelper* mCodecHelper;
++};
++
++} // namespace android
++
++#endif // C2_FFMPEG_AUDIO_DECODE_COMPONENT_H
+diff --git a/codec2/C2FFMPEGAudioDecodeInterface.cpp b/codec2/C2FFMPEGAudioDecodeInterface.cpp
+new file mode 100644
+index 0000000..f448013
+--- /dev/null
++++ b/codec2/C2FFMPEGAudioDecodeInterface.cpp
+@@ -0,0 +1,116 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define LOG_TAG "C2FFMPEGAudioDecodeInterface"
++#include <log/log.h>
++
++#include <media/stagefright/foundation/MediaDefs.h>
++#include "C2FFMPEGAudioDecodeInterface.h"
++
++#define MAX_CHANNEL_COUNT 8
++
++namespace android {
++
++constexpr size_t kDefaultOutputPortDelay = 2;
++constexpr size_t kMaxOutputPortDelay = 16;
++
++C2FFMPEGAudioDecodeInterface::C2FFMPEGAudioDecodeInterface(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2ReflectorHelper>& helper)
++    : SimpleInterface<void>::BaseParams(
++        helper,
++        componentInfo->name,
++        C2Component::KIND_DECODER,
++        C2Component::DOMAIN_AUDIO,
++        componentInfo->mediaType) {
++    noPrivateBuffers();
++    noInputReferences();
++    noOutputReferences();
++    noInputLatency();
++    noTimeStretch();
++    setDerivedInstance(this);
++
++    addParameter(
++            DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
++            .withDefault(new C2PortActualDelayTuning::output(kDefaultOutputPortDelay))
++            .withFields({C2F(mActualOutputDelay, value).inRange(0, kMaxOutputPortDelay)})
++            .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
++            .build());
++
++    addParameter(
++            DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
++            .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
++            .withFields({C2F(mSampleRate, value).oneOf({
++                7350, 8000, 11025, 12000, 16000, 22050, 24000, 32000,
++                44100, 48000, 64000, 88200, 96000, 192000
++            })})
++            .withSetter(Setter<decltype(*mSampleRate)>::NonStrictValueWithNoDeps)
++            .build());
++
++    addParameter(
++            DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
++            .withDefault(new C2StreamBitrateInfo::input(0u, 64000))
++            .withFields({C2F(mBitrate, value).inRange(8000, 320000)})
++            .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
++            .build());
++
++    addParameter(
++            DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
++            .withDefault(new C2StreamChannelCountInfo::output(0u, 2))
++            .withFields({C2F(mChannelCount, value).inRange(1, MAX_CHANNEL_COUNT)})
++            .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
++            .build());
++
++    addParameter(
++            DefineParam(mPcmEncodingInfo, C2_PARAMKEY_PCM_ENCODING)
++            .withDefault(new C2StreamPcmEncodingInfo::output(0u, C2Config::PCM_16))
++            .withFields({C2F(mPcmEncodingInfo, value).oneOf({
++                 C2Config::PCM_16,
++                 C2Config::PCM_8,
++                 C2Config::PCM_FLOAT,
++                 C2Config::PCM_32})
++            })
++            .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
++            .build());
++
++    if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_AUDIO_WMA) == 0) {
++        addParameter(
++                DefineParam(mInputMaxBufSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
++                .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 32768))
++                .build());
++    }
++
++    addParameter(
++            DefineParam(mRawCodecData, C2_PARAMKEY_RAW_CODEC_DATA)
++            .withDefault(C2StreamRawCodecDataInfo::input::AllocShared(0, 0u))
++            .withFields({C2F(mRawCodecData, m.value)})
++            .withSetter(CodecSetter)
++            .build());
++}
++
++C2R C2FFMPEGAudioDecodeInterface::CodecSetter(
++        bool mayBlock __unused, C2P<C2StreamRawCodecDataInfo::input>& me __unused) {
++    return C2R::Ok();
++}
++
++const FFMPEGAudioCodecInfo* C2FFMPEGAudioDecodeInterface::getCodecInfo() const {
++    if (mRawCodecData->flexCount() == sizeof(FFMPEGAudioCodecInfo)) {
++        return (const FFMPEGAudioCodecInfo*)mRawCodecData->m.value;
++    }
++    return nullptr;
++}
++
++} // namespace android
+diff --git a/codec2/C2FFMPEGAudioDecodeInterface.h b/codec2/C2FFMPEGAudioDecodeInterface.h
+new file mode 100644
+index 0000000..c72fea4
+--- /dev/null
++++ b/codec2/C2FFMPEGAudioDecodeInterface.h
+@@ -0,0 +1,53 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef C2_FFMPEG_AUDIO_DECODE_INTERFACE_H
++#define C2_FFMPEG_AUDIO_DECODE_INTERFACE_H
++
++#include <SimpleC2Interface.h>
++#include "C2FFMPEGCommon.h"
++#include "codec_utils.h"
++
++namespace android {
++
++class C2FFMPEGAudioDecodeInterface : public SimpleInterface<void>::BaseParams {
++public:
++    explicit C2FFMPEGAudioDecodeInterface(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2ReflectorHelper>& helper);
++
++    uint32_t getSampleRate() const { return mSampleRate->value; }
++    uint32_t getChannelCount() const { return mChannelCount->value; }
++    uint32_t getBitrate() const { return mBitrate->value; }
++    C2Config::pcm_encoding_t getPcmEncodingInfo() const { return mPcmEncodingInfo->value; }
++    const FFMPEGAudioCodecInfo* getCodecInfo() const;
++
++private:
++    static C2R CodecSetter(
++        bool mayBlock, C2P<C2StreamRawCodecDataInfo::input>& me);
++
++private:
++    std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
++    std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
++    std::shared_ptr<C2StreamBitrateInfo::input> mBitrate;
++    std::shared_ptr<C2StreamPcmEncodingInfo::output> mPcmEncodingInfo;
++    std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
++    std::shared_ptr<C2StreamRawCodecDataInfo::input> mRawCodecData;
++};
++
++} // namespace android
++
++#endif // C2_FFMPEG_AUDIO_DECODE_INTERFACE_H
+diff --git a/codec2/C2FFMPEGCommon.h b/codec2/C2FFMPEGCommon.h
+new file mode 100644
+index 0000000..f1a85b8
+--- /dev/null
++++ b/codec2/C2FFMPEGCommon.h
+@@ -0,0 +1,33 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef C2_FFMPEG_COMPONENT_COMMON_H
++#define C2_FFMPEG_COMPONENT_COMMON_H
++
++#include <media/stagefright/foundation/MediaDefs.h>
++#include "ffmpeg_utils.h"
++
++namespace android {
++
++typedef struct {
++    const char* name;
++    const char* mediaType;
++    enum AVCodecID codecID;
++} C2FFMPEGComponentInfo;
++
++} // namespace android
++
++#endif // C2_FFMPEG_COMPONENT_COMMON_H
+diff --git a/codec2/C2FFMPEGVideoDecodeComponent.cpp b/codec2/C2FFMPEGVideoDecodeComponent.cpp
+new file mode 100644
+index 0000000..12c90e1
+--- /dev/null
++++ b/codec2/C2FFMPEGVideoDecodeComponent.cpp
+@@ -0,0 +1,699 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define LOG_TAG "C2FFMPEGVideoDecodeComponent"
++#include <android-base/properties.h>
++#include <log/log.h>
++#include <algorithm>
++
++#include <SimpleC2Interface.h>
++#include "C2FFMPEGVideoDecodeComponent.h"
++#include "ffmpeg_hwaccel.h"
++
++#define DEBUG_FRAMES 0
++#define DEBUG_WORKQUEUE 0
++#define DEBUG_EXTRADATA 0
++
++namespace android {
++
++C2FFMPEGVideoDecodeComponent::C2FFMPEGVideoDecodeComponent(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2FFMPEGVideoDecodeInterface>& intf)
++    : SimpleC2Component(std::make_shared<SimpleInterface<C2FFMPEGVideoDecodeInterface>>(componentInfo->name, 0, intf)),
++      mInfo(componentInfo),
++      mIntf(intf),
++      mCodecID(componentInfo->codecID),
++      mCtx(NULL),
++      mImgConvertCtx(NULL),
++      mFrame(NULL),
++      mPacket(NULL),
++      mFFMPEGInitialized(false),
++      mCodecAlreadyOpened(false),
++      mExtradataReady(false),
++      mEOSSignalled(false) {
++    ALOGD("C2FFMPEGVideoDecodeComponent: mediaType = %s", componentInfo->mediaType);
++}
++
++C2FFMPEGVideoDecodeComponent::~C2FFMPEGVideoDecodeComponent() {
++    ALOGD("~C2FFMPEGVideoDecodeComponent: mCtx = %p", mCtx);
++    onRelease();
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::initDecoder() {
++    if (! mFFMPEGInitialized) {
++        if (initFFmpeg() != C2_OK) {
++            ALOGE("initDecoder: FFMPEG initialization failed.");
++            return C2_NO_INIT;
++        }
++        mFFMPEGInitialized = true;
++    }
++
++    mCtx = avcodec_alloc_context3(NULL);
++    if (! mCtx) {
++        ALOGE("initDecoder: avcodec_alloc_context failed.");
++        return C2_NO_MEMORY;
++    }
++
++    C2StreamPictureSizeInfo::output size(0u, 320, 240);
++    c2_status_t err = mIntf->query({ &size }, {}, C2_DONT_BLOCK, nullptr);
++    if (err != C2_OK) {
++        ALOGE("initDecoder: cannot query picture size, err = %d", err);
++    }
++
++    mCtx->codec_type = AVMEDIA_TYPE_VIDEO;
++    mCtx->codec_id = mCodecID;
++    mCtx->extradata_size = 0;
++    mCtx->extradata = NULL;
++    mCtx->width = size.width;
++    mCtx->height = size.height;
++
++    const FFMPEGVideoCodecInfo* codecInfo = mIntf->getCodecInfo();
++
++    if (codecInfo) {
++        ALOGD("initDecoder: use codec info from extractor");
++        mCtx->codec_id = (enum AVCodecID)codecInfo->codec_id;
++    }
++
++    ALOGD("initDecoder: %p [%s], %d x %d, %s",
++          mCtx, avcodec_get_name(mCtx->codec_id), size.width, size.height, mInfo->mediaType);
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::openDecoder() {
++    if (mCodecAlreadyOpened) {
++        return C2_OK;
++    }
++
++    // Can't change extradata after opening the decoder.
++#if DEBUG_EXTRADATA
++    ALOGD("openDecoder: extradata_size = %d", mCtx->extradata_size);
++#endif
++    mExtradataReady = true;
++
++    // Find decoder again as codec_id may have changed.
++    mCtx->codec = avcodec_find_decoder(mCtx->codec_id);
++    if (! mCtx->codec) {
++        ALOGE("openDecoder: ffmpeg video decoder failed to find codec %d", mCtx->codec_id);
++        return C2_NOT_FOUND;
++    }
++
++    // Configure decoder.
++    mCtx->workaround_bugs   = 1;
++    mCtx->idct_algo         = 0;
++    mCtx->skip_frame        = AVDISCARD_DEFAULT;
++    mCtx->skip_idct         = AVDISCARD_DEFAULT;
++    mCtx->skip_loop_filter  = AVDISCARD_DEFAULT;
++    mCtx->error_concealment = 3;
++    mCtx->thread_count      = base::GetIntProperty("debug.ffmpeg-codec2.threads", 0);
++
++    if (base::GetBoolProperty("debug.ffmpeg-codec2.fast", false)) {
++        mCtx->flags2 |= AV_CODEC_FLAG2_FAST;
++    }
++
++    ffmpeg_hwaccel_init(mCtx);
++
++    ALOGD("openDecoder: opening ffmpeg decoder(%s): threads = %d, hw = %s",
++          avcodec_get_name(mCtx->codec_id), mCtx->thread_count, mCtx->hw_device_ctx ? "yes" : "no");
++
++    int err = avcodec_open2(mCtx, mCtx->codec, NULL);
++    if (err < 0) {
++        ALOGE("openDecoder: ffmpeg video decoder failed to initialize. (%s)", av_err2str(err));
++        return C2_NO_INIT;
++    }
++    mCodecAlreadyOpened = true;
++
++    ALOGD("openDecoder: open ffmpeg video decoder(%s) success, caps = %08x",
++          avcodec_get_name(mCtx->codec_id), mCtx->codec->capabilities);
++
++    mFrame = av_frame_alloc();
++    if (! mFrame) {
++        ALOGE("openDecoder: oom for video frame");
++        return C2_NO_MEMORY;
++    }
++
++    return C2_OK;
++}
++
++void C2FFMPEGVideoDecodeComponent::deInitDecoder() {
++    ALOGD("%p deInitDecoder: %p", this, mCtx);
++    if (mCtx) {
++        if (avcodec_is_open(mCtx)) {
++            avcodec_flush_buffers(mCtx);
++        }
++        if (mCtx->extradata) {
++            av_free(mCtx->extradata);
++            mCtx->extradata = NULL;
++            mCtx->extradata_size = 0;
++        }
++        if (mCodecAlreadyOpened) {
++            avcodec_close(mCtx);
++            mCodecAlreadyOpened = false;
++        }
++        ffmpeg_hwaccel_deinit(mCtx);
++        av_freep(&mCtx);
++    }
++    if (mFrame) {
++        av_frame_free(&mFrame);
++        mFrame = NULL;
++    }
++    if (mPacket) {
++        av_packet_free(&mPacket);
++        mPacket = NULL;
++    }
++    if (mImgConvertCtx) {
++        sws_freeContext(mImgConvertCtx);
++        mImgConvertCtx = NULL;
++    }
++    mEOSSignalled = false;
++    mExtradataReady = false;
++    mPendingWorkQueue.clear();
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::processCodecConfig(C2ReadView* inBuffer) {
++    int orig_extradata_size = mCtx->extradata_size;
++    int add_extradata_size = inBuffer->capacity();
++
++#if DEBUG_EXTRADATA
++    ALOGD("processCodecConfig: add = %u, current = %d", add_extradata_size, orig_extradata_size);
++#endif
++    if (! mExtradataReady) {
++        mCtx->extradata_size += add_extradata_size;
++        mCtx->extradata = (uint8_t *) realloc(mCtx->extradata, mCtx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
++        if (! mCtx->extradata) {
++            ALOGE("processCodecConfig: ffmpeg video decoder failed to alloc extradata memory.");
++            return C2_NO_MEMORY;
++        }
++        memcpy(mCtx->extradata + orig_extradata_size, inBuffer->data(), add_extradata_size);
++        memset(mCtx->extradata + mCtx->extradata_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++    }
++    else {
++        ALOGW("processCodecConfig: decoder is already opened, ignoring...");
++    }
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::sendInputBuffer(
++        C2ReadView *inBuffer, int64_t timestamp) {
++    if (!mPacket) {
++        mPacket = av_packet_alloc();
++        if (!mPacket) {
++            ALOGE("sendInputBuffer: oom for video packet");
++            return C2_NO_MEMORY;
++        }
++    }
++
++    mPacket->data = inBuffer ? const_cast<uint8_t *>(inBuffer->data()) : NULL;
++    mPacket->size = inBuffer ? inBuffer->capacity() : 0;
++    mPacket->pts = timestamp;
++    mPacket->dts = AV_NOPTS_VALUE;
++
++    int err = avcodec_send_packet(mCtx, mPacket);
++    av_packet_unref(mPacket);
++
++    if (err < 0) {
++        ALOGE("sendInputBuffer: failed to send data (%d) to decoder: %s (%08x)",
++              inBuffer->capacity(), av_err2str(err), err);
++        if (err == AVERROR(EAGAIN)) {
++            // Frames must be read first, notify main decoding loop.
++            ALOGD("sendInputBuffer: returning C2_BAD_STATE");
++            return C2_BAD_STATE;
++        }
++        // Otherwise don't send error to client.
++    }
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::receiveFrame(bool* hasPicture) {
++    int err = avcodec_receive_frame(mCtx, mFrame);
++
++    *hasPicture = false;
++    if (err == 0) {
++        err = ffmpeg_hwaccel_get_frame(mCtx, mFrame);
++        if (err == 0) {
++            *hasPicture = true;
++        } else {
++            ALOGE("receiveFrame: failed to receive frame from HW decoder err = %d", err);
++            // Don't send error to client, skip frame!
++        }
++    } else if (err != AVERROR(EAGAIN) && err != AVERROR_EOF) {
++        ALOGE("receiveFrame: failed to receive frame from decoder err = %d", err);
++        // Don't report error to client.
++    }
++
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuffer) {
++    uint8_t* data[4];
++    int linesize[4];
++    C2PlanarLayout layout = outBuffer->layout();
++
++    data[0] = outBuffer->data()[C2PlanarLayout::PLANE_Y];
++    data[1] = outBuffer->data()[C2PlanarLayout::PLANE_U];
++    data[2] = outBuffer->data()[C2PlanarLayout::PLANE_V];
++    linesize[0] = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
++    linesize[1] = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
++    linesize[2] = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
++
++    mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
++           mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format,
++           mFrame->width, mFrame->height, AV_PIX_FMT_YUV420P,
++           SWS_BICUBIC, NULL, NULL, NULL);
++    if (! mImgConvertCtx) {
++        ALOGE("getOutputBuffer: cannot initialize the conversion context");
++        return C2_NO_MEMORY;
++    }
++    sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
++            0, mFrame->height, data, linesize);
++
++    return C2_OK;
++}
++
++static void fillEmptyWork(const std::unique_ptr<C2Work>& work) {
++    work->worklets.front()->output.flags =
++        (C2FrameData::flags_t)(work->input.flags & C2FrameData::FLAG_END_OF_STREAM);
++    work->worklets.front()->output.buffers.clear();
++    work->worklets.front()->output.ordinal = work->input.ordinal;
++    work->workletsProcessed = 1u;
++    work->result = C2_OK;
++#if DEBUG_WORKQUEUE
++    ALOGD("WorkQueue: drop idx=%" PRIu64 ", ts=%" PRIu64,
++          work->input.ordinal.frameIndex.peeku(), work->input.ordinal.timestamp.peeku());
++#endif
++}
++
++static bool comparePendingWork(const PendingWork& w1, const PendingWork& w2) {
++    return w1.second < w2.second;
++}
++
++void C2FFMPEGVideoDecodeComponent::pushPendingWork(const std::unique_ptr<C2Work>& work) {
++    uint32_t outputDelay = mIntf->getOutputDelay();
++
++    if (mPendingWorkQueue.size() >= outputDelay) {
++        uint32_t newOutputDelay = outputDelay;
++        std::vector<std::unique_ptr<C2Param>> configUpdate;
++
++        switch (mCtx->codec_id) {
++            case AV_CODEC_ID_HEVC:
++            case AV_CODEC_ID_H264:
++                // Increase output delay step-wise.
++                if (outputDelay >= 18u) {
++                    newOutputDelay = 34u;
++                } else if (outputDelay >= 8u) {
++                    newOutputDelay = 18u;
++                } else {
++                    newOutputDelay = 8u;
++                }
++                break;
++            default:
++                // Other codecs use constant output delay.
++                break;
++        }
++
++        if (newOutputDelay != outputDelay) {
++            C2PortActualDelayTuning::output delay(newOutputDelay);
++            std::vector<std::unique_ptr<C2SettingResult>> failures;
++            int err;
++
++            err = mIntf->config({ &delay }, C2_MAY_BLOCK, &failures);
++            if (err == C2_OK) {
++                ALOGD("WorkQueue: queue full, output delay set to %u", newOutputDelay);
++                configUpdate.push_back(C2Param::Copy(delay));
++            } else {
++                ALOGE("WorkQueue: output delay update to %u failed err = %d",
++                      newOutputDelay, err);
++            }
++        }
++
++        auto fillEmptyWorkWithConfigUpdate = [&configUpdate](const std::unique_ptr<C2Work>& work) {
++            fillEmptyWork(work);
++            work->worklets.front()->output.configUpdate = std::move(configUpdate);
++        };
++
++        finish(mPendingWorkQueue.front().first, fillEmptyWorkWithConfigUpdate);
++        mPendingWorkQueue.pop_front();
++    }
++#if DEBUG_WORKQUEUE
++    ALOGD("WorkQueue: push idx=%" PRIu64 ", ts=%" PRIu64,
++          work->input.ordinal.frameIndex.peeku(), work->input.ordinal.timestamp.peeku());
++#endif
++    mPendingWorkQueue.push_back(PendingWork(work->input.ordinal.frameIndex.peeku(),
++                                            work->input.ordinal.timestamp.peeku()));
++    std::sort(mPendingWorkQueue.begin(), mPendingWorkQueue.end(), comparePendingWork);
++}
++
++void C2FFMPEGVideoDecodeComponent::popPendingWork(const std::unique_ptr<C2Work>& work) {
++    uint64_t index = work->input.ordinal.frameIndex.peeku();
++    auto it = std::find_if(mPendingWorkQueue.begin(), mPendingWorkQueue.end(),
++                           [index](const PendingWork& pWork) { return index == pWork.first; });
++
++#if DEBUG_WORKQUEUE
++    ALOGD("WorkQueue: pop idx=%" PRIu64 ", ts=%" PRIu64,
++          work->input.ordinal.frameIndex.peeku(), work->input.ordinal.timestamp.peeku());
++#endif
++
++    if (it != mPendingWorkQueue.end()) {
++        mPendingWorkQueue.erase(it);
++    }
++#if DEBUG_WORKQUEUE
++    else {
++        ALOGD("WorkQueue: pop work not found idx=%" PRIu64 ", ts=%" PRIu64,
++              work->input.ordinal.frameIndex.peeku(), work->input.ordinal.timestamp.peeku());
++    }
++#endif
++    prunePendingWorksUntil(work);
++}
++
++void C2FFMPEGVideoDecodeComponent::prunePendingWorksUntil(const std::unique_ptr<C2Work>& work) {
++#if DEBUG_WORKQUEUE
++    ALOGD("WorkQueue: prune until idx=%" PRIu64 ", ts=%" PRIu64,
++          work->input.ordinal.frameIndex.peeku(), work->input.ordinal.timestamp.peeku());
++#endif
++    // Drop all works with a PTS earlier than provided argument.
++    while (mPendingWorkQueue.size() > 0 &&
++           mPendingWorkQueue.front().second < work->input.ordinal.timestamp.peeku()) {
++        finish(mPendingWorkQueue.front().first, fillEmptyWork);
++        mPendingWorkQueue.pop_front();
++    }
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::onInit() {
++    ALOGD("onInit");
++    return initDecoder();
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::onStop() {
++    ALOGD("onStop");
++    return C2_OK;
++}
++
++void C2FFMPEGVideoDecodeComponent::onReset() {
++    ALOGD("onReset");
++    deInitDecoder();
++    initDecoder();
++}
++
++void C2FFMPEGVideoDecodeComponent::onRelease() {
++    ALOGD("onRelease");
++    deInitDecoder();
++    if (mFFMPEGInitialized) {
++        deInitFFmpeg();
++        mFFMPEGInitialized = false;
++    }
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::onFlush_sm() {
++    ALOGD("onFlush_sm");
++    if (mCtx && avcodec_is_open(mCtx)) {
++        // Make sure that the next buffer output does not still
++        // depend on fragments from the last one decoded.
++        avcodec_flush_buffers(mCtx);
++        mEOSSignalled = false;
++    }
++    return C2_OK;
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::outputFrame(
++    const std::unique_ptr<C2Work>& work,
++    const std::shared_ptr<C2BlockPool> &pool
++) {
++    c2_status_t err;
++    std::vector<std::unique_ptr<C2Param>> configUpdate;
++
++#if DEBUG_FRAMES
++    ALOGD("outputFrame: pts=%" PRId64 " dts=%" PRId64 " ts=%" PRId64 " - %d x %d (%x)",
++          mFrame->pts, mFrame->pkt_dts, mFrame->best_effort_timestamp, mFrame->width, mFrame->height, mFrame->format);
++#endif
++
++    if (mFrame->width != mIntf->getWidth() || mFrame->height != mIntf->getHeight()) {
++        ALOGD("outputFrame: video params changed - %d x %d (%x)", mFrame->width, mFrame->height, mFrame->format);
++
++        C2StreamPictureSizeInfo::output size(0u, mFrame->width, mFrame->height);
++        std::vector<std::unique_ptr<C2SettingResult>> failures;
++
++        err = mIntf->config({ &size }, C2_MAY_BLOCK, &failures);
++        if (err == OK) {
++            configUpdate.push_back(C2Param::Copy(size));
++            mCtx->width = mFrame->width;
++            mCtx->height = mFrame->height;
++        } else {
++            ALOGE("outputFrame: config update failed err = %d", err);
++            return C2_CORRUPTED;
++        }
++    }
++
++    std::shared_ptr<C2GraphicBlock> block;
++
++    err = pool->fetchGraphicBlock(mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12,
++                                  { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
++
++    if (err != C2_OK) {
++        ALOGE("outputFrame: failed to fetch graphic block %d x %x (%x) err = %d",
++              mFrame->width, mFrame->height, format, err);
++        return C2_CORRUPTED;
++    }
++
++    C2GraphicView wView = block->map().get();
++
++    err = wView.error();
++    if (err != C2_OK) {
++        ALOGE("outputFrame: graphic view map failed err = %d", err);
++        return C2_CORRUPTED;
++    }
++
++    err = getOutputBuffer(&wView);
++    if (err == C2_OK) {
++        std::shared_ptr<C2Buffer> buffer = createGraphicBuffer(std::move(block), C2Rect(mFrame->width, mFrame->height));
++
++        buffer->setInfo(mIntf->getPixelFormatInfo());
++
++        if (work && c2_cntr64_t(mFrame->best_effort_timestamp) == work->input.ordinal.frameIndex) {
++            prunePendingWorksUntil(work);
++            work->worklets.front()->output.configUpdate = std::move(configUpdate);
++            work->worklets.front()->output.buffers.clear();
++            work->worklets.front()->output.buffers.push_back(buffer);
++            work->worklets.front()->output.ordinal = work->input.ordinal;
++            work->workletsProcessed = 1u;
++            work->result = C2_OK;
++        } else {
++            auto fillWork = [buffer, &configUpdate, this](const std::unique_ptr<C2Work>& work) {
++                popPendingWork(work);
++                work->worklets.front()->output.configUpdate = std::move(configUpdate);
++                work->worklets.front()->output.flags = (C2FrameData::flags_t)0;
++                work->worklets.front()->output.buffers.clear();
++                work->worklets.front()->output.buffers.push_back(buffer);
++                work->worklets.front()->output.ordinal = work->input.ordinal;
++                work->workletsProcessed = 1u;
++                work->result = C2_OK;
++#if DEBUG_FRAMES
++                ALOGD("outputFrame: work(finish) idx=%" PRIu64 ", processed=%u, result=%d",
++                      work->input.ordinal.frameIndex.peeku(), work->workletsProcessed, work->result);
++#endif
++            };
++
++            finish(mFrame->best_effort_timestamp, fillWork);
++        }
++    } else {
++        return err;
++    }
++
++    return C2_OK;
++}
++
++void C2FFMPEGVideoDecodeComponent::process(
++    const std::unique_ptr<C2Work> &work,
++    const std::shared_ptr<C2BlockPool> &pool
++) {
++    size_t inSize = 0u;
++    bool eos = (work->input.flags & C2FrameData::FLAG_END_OF_STREAM);
++    C2ReadView rView = mDummyReadView;
++    bool hasInputBuffer = false;
++
++    if (! work->input.buffers.empty()) {
++        rView = work->input.buffers[0]->data().linearBlocks().front().map().get();
++        inSize = rView.capacity();
++        hasInputBuffer = true;
++    }
++
++#if DEBUG_FRAMES
++    ALOGD("process: input flags=%08x ts=%lu idx=%lu #buf=%lu[%lu] #conf=%lu #info=%lu",
++          work->input.flags, work->input.ordinal.timestamp.peeku(), work->input.ordinal.frameIndex.peeku(),
++          work->input.buffers.size(), inSize, work->input.configUpdate.size(), work->input.infoBuffers.size());
++#endif
++
++    if (mEOSSignalled) {
++        ALOGE("process: ignoring work while EOS reached");
++        work->workletsProcessed = 0u;
++        work->result = C2_BAD_VALUE;
++        return;
++    }
++
++    if (hasInputBuffer && rView.error()) {
++        ALOGE("process: read view map failed err = %d", rView.error());
++        work->workletsProcessed = 0u;
++        work->result = rView.error();
++        return;
++    }
++
++    // In all cases the work is marked as completed.
++    //
++    // There is not always a 1:1 mapping between input and output frames, in particular for
++    // interlaced content. Keeping the corresponding worklets in the queue quickly fills it
++    // in and stalls the decoder. But there's no obvious mechanism to determine, from
++    // FFMPEG API, whether a given packet will produce an output frame and the worklet should
++    // be kept around so it can be completed when the frame is produced.
++    //
++    // NOTE: This has an impact on the drain operation.
++
++    work->result = C2_OK;
++    work->worklets.front()->output.flags = (C2FrameData::flags_t)0;
++    work->workletsProcessed = 0u;
++
++    if (inSize || (eos && mCodecAlreadyOpened)) {
++        c2_status_t err = C2_OK;
++
++        if (work->input.flags & C2FrameData::FLAG_CODEC_CONFIG) {
++            work->workletsProcessed = 1u;
++            work->result = processCodecConfig(&rView);
++            return;
++        }
++
++        if (! mCodecAlreadyOpened) {
++            err = openDecoder();
++            if (err != C2_OK) {
++                work->workletsProcessed = 1u;
++                work->result = err;
++                return;
++            }
++        }
++
++        bool inputConsumed = false;
++        bool outputAvailable = true;
++        bool hasPicture = false;
++#if DEBUG_FRAMES
++        int outputFrameCount = 0;
++#endif
++
++        while (!inputConsumed || outputAvailable) {
++            if (!inputConsumed) {
++                err = sendInputBuffer(&rView, work->input.ordinal.frameIndex.peekll());
++                if (err == C2_OK) {
++                    inputConsumed = true;
++                    outputAvailable = true;
++                    work->input.buffers.clear();
++                } else if (err != C2_BAD_STATE) {
++                    work->workletsProcessed = 1u;
++                    work->result = err;
++                    return;
++                }
++            }
++
++            if (outputAvailable) {
++                hasPicture = false;
++                err = receiveFrame(&hasPicture);
++                if (err != C2_OK) {
++                    work->workletsProcessed = 1u;
++                    work->result = err;
++                    return;
++                }
++
++                if (hasPicture) {
++                    err = outputFrame(work, pool);
++                    if (err != C2_OK) {
++                        work->workletsProcessed = 1u;
++                        work->result = err;
++                        return;
++                    }
++#if DEBUG_FRAMES
++                    else {
++                        outputFrameCount++;
++                    }
++#endif
++                }
++                else {
++#if DEBUG_FRAMES
++                    if (!outputFrameCount) {
++                        ALOGD("process: no frame");
++                    }
++#endif
++                    outputAvailable = false;
++                }
++            }
++        }
++    }
++#if DEBUG_FRAMES
++    else {
++        ALOGD("process: empty work");
++    }
++#endif
++
++    if (eos) {
++        mEOSSignalled = true;
++        work->worklets.front()->output.flags = C2FrameData::FLAG_END_OF_STREAM;
++        work->workletsProcessed = 1u;
++    }
++
++    if (work->workletsProcessed == 0u) {
++        pushPendingWork(work);
++    }
++
++#if DEBUG_FRAMES
++    ALOGD("process: work(end) idx=%" PRIu64 ", processed=%u, result=%d",
++          work->input.ordinal.frameIndex.peeku(), work->workletsProcessed, work->result);
++#endif
++}
++
++c2_status_t C2FFMPEGVideoDecodeComponent::drain(
++    uint32_t drainMode,
++    const std::shared_ptr<C2BlockPool>& pool
++) {
++    ALOGD("drain: mode = %u", drainMode);
++
++    if (drainMode == NO_DRAIN) {
++        ALOGW("drain: NO_DRAIN is no-op");
++        return C2_OK;
++    }
++    if (drainMode == DRAIN_CHAIN) {
++        ALOGW("drain: DRAIN_CHAIN not supported");
++        return C2_OMITTED;
++    }
++    if (! mCodecAlreadyOpened) {
++        ALOGW("drain: codec not opened yet");
++        return C2_OK;
++    }
++
++    bool hasPicture = false;
++    c2_status_t err = C2_OK;
++
++    err = sendInputBuffer(NULL, 0);
++    while (err == C2_OK) {
++        hasPicture = false;
++        err = receiveFrame(&hasPicture);
++        if (hasPicture) {
++            // Ignore errors at this point, just drain the decoder.
++            outputFrame(nullptr, pool);
++        } else {
++            err = C2_NOT_FOUND;
++        }
++    }
++
++    return C2_OK;
++}
++
++} // namespace android
+diff --git a/codec2/C2FFMPEGVideoDecodeComponent.h b/codec2/C2FFMPEGVideoDecodeComponent.h
+new file mode 100644
+index 0000000..241ddcf
+--- /dev/null
++++ b/codec2/C2FFMPEGVideoDecodeComponent.h
+@@ -0,0 +1,83 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef C2_FFMPEG_VIDEO_DECODE_COMPONENT_H
++#define C2_FFMPEG_VIDEO_DECODE_COMPONENT_H
++
++#include <deque>
++#include <utility>
++#include <SimpleC2Component.h>
++#include "C2FFMPEGCommon.h"
++#include "C2FFMPEGVideoDecodeInterface.h"
++
++namespace android {
++
++typedef std::pair<uint64_t, uint64_t> PendingWork;
++
++class C2FFMPEGVideoDecodeComponent : public SimpleC2Component {
++public:
++    explicit C2FFMPEGVideoDecodeComponent(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2FFMPEGVideoDecodeInterface>& intf);
++    virtual ~C2FFMPEGVideoDecodeComponent();
++
++protected:
++    c2_status_t onInit() override;
++    c2_status_t onStop() override;
++    void onReset() override;
++    void onRelease() override;
++    c2_status_t onFlush_sm() override;
++    void process(
++        const std::unique_ptr<C2Work> &work,
++        const std::shared_ptr<C2BlockPool> &pool) override;
++    c2_status_t drain(
++        uint32_t drainMode,
++        const std::shared_ptr<C2BlockPool> &pool) override;
++
++private:
++    c2_status_t initDecoder();
++    c2_status_t openDecoder();
++    void deInitDecoder();
++    c2_status_t processCodecConfig(C2ReadView* inBuffer);
++    c2_status_t sendInputBuffer(C2ReadView* inBuffer, int64_t timestamp);
++    c2_status_t receiveFrame(bool* hasPicture);
++    c2_status_t getOutputBuffer(C2GraphicView* outBuffer);
++    c2_status_t outputFrame(
++        const std::unique_ptr<C2Work> &work,
++        const std::shared_ptr<C2BlockPool> &pool);
++
++    void pushPendingWork(const std::unique_ptr<C2Work>& work);
++    void popPendingWork(const std::unique_ptr<C2Work>& work);
++    void prunePendingWorksUntil(const std::unique_ptr<C2Work>& work);
++
++private:
++    const C2FFMPEGComponentInfo* mInfo;
++    std::shared_ptr<C2FFMPEGVideoDecodeInterface> mIntf;
++    enum AVCodecID mCodecID;
++    AVCodecContext* mCtx;
++    struct SwsContext *mImgConvertCtx;
++    AVFrame* mFrame;
++    AVPacket* mPacket;
++    bool mFFMPEGInitialized;
++    bool mCodecAlreadyOpened;
++    bool mExtradataReady;
++    bool mEOSSignalled;
++    std::deque<PendingWork> mPendingWorkQueue;
++};
++
++} // namespace android
++
++#endif // C2_FFMPEG_VIDEO_DECODE_COMPONENT_H
+diff --git a/codec2/C2FFMPEGVideoDecodeInterface.cpp b/codec2/C2FFMPEGVideoDecodeInterface.cpp
+new file mode 100644
+index 0000000..e3368f2
+--- /dev/null
++++ b/codec2/C2FFMPEGVideoDecodeInterface.cpp
+@@ -0,0 +1,254 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define LOG_TAG "C2FFMPEGVideoDecodeInterface"
++#include <android-base/properties.h>
++#include <log/log.h>
++#include <thread>
++
++#include <media/stagefright/foundation/MediaDefs.h>
++#include "C2FFMPEGVideoDecodeInterface.h"
++
++namespace android {
++
++constexpr size_t kMaxDimension = 4080;
++
++C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2ReflectorHelper>& helper)
++    : SimpleInterface<void>::BaseParams(
++        helper,
++        componentInfo->name,
++        C2Component::KIND_DECODER,
++        C2Component::DOMAIN_VIDEO,
++        componentInfo->mediaType) {
++    noPrivateBuffers();
++    noInputReferences();
++    noOutputReferences();
++    noInputLatency();
++    noTimeStretch();
++    setDerivedInstance(this);
++
++    addParameter(
++            DefineParam(mAttrib, C2_PARAMKEY_COMPONENT_ATTRIBUTES)
++            .withConstValue(new C2ComponentAttributesSetting(C2Component::ATTRIB_IS_TEMPORAL))
++            .build());
++
++    addParameter(
++            DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
++            .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
++            .withFields({
++                C2F(mSize, width).inRange(16, kMaxDimension, 2),
++                C2F(mSize, height).inRange(16, kMaxDimension, 2),
++            })
++            .withSetter(SizeSetter)
++            .build());
++
++    if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_VIDEO_MPEG2) == 0) {
++        addParameter(
++                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
++                .withConstValue(new C2PortActualDelayTuning::output(3u))
++                .build());
++
++        addParameter(
++                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
++                .withDefault(new C2StreamProfileLevelInfo::input(0u,
++                        C2Config::PROFILE_MP2V_SIMPLE, C2Config::LEVEL_MP2V_HIGH))
++                .withFields({
++                    C2F(mProfileLevel, profile).oneOf({
++                            C2Config::PROFILE_MP2V_SIMPLE,
++                            C2Config::PROFILE_MP2V_MAIN}),
++                    C2F(mProfileLevel, level).oneOf({
++                            C2Config::LEVEL_MP2V_LOW,
++                            C2Config::LEVEL_MP2V_MAIN,
++                            C2Config::LEVEL_MP2V_HIGH_1440,
++                            C2Config::LEVEL_MP2V_HIGH})
++                })
++                .withSetter(ProfileLevelSetter, mSize)
++                .build());
++    }
++
++    else if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_VIDEO_AVC) == 0) {
++        addParameter(
++                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
++                .withDefault(new C2PortActualDelayTuning::output(8u))
++                .withFields({C2F(mActualOutputDelay, value).inRange(0, 34u)})
++                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
++                .build());
++
++        addParameter(
++                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
++                .withDefault(new C2StreamProfileLevelInfo::input(0u,
++                        C2Config::PROFILE_AVC_CONSTRAINED_BASELINE, C2Config::LEVEL_AVC_5_2))
++                .withFields({
++                    C2F(mProfileLevel, profile).oneOf({
++                            C2Config::PROFILE_AVC_CONSTRAINED_BASELINE,
++                            C2Config::PROFILE_AVC_BASELINE,
++                            C2Config::PROFILE_AVC_MAIN,
++                            C2Config::PROFILE_AVC_CONSTRAINED_HIGH,
++                            C2Config::PROFILE_AVC_PROGRESSIVE_HIGH,
++                            C2Config::PROFILE_AVC_HIGH}),
++                    C2F(mProfileLevel, level).oneOf({
++                            C2Config::LEVEL_AVC_1, C2Config::LEVEL_AVC_1B, C2Config::LEVEL_AVC_1_1,
++                            C2Config::LEVEL_AVC_1_2, C2Config::LEVEL_AVC_1_3,
++                            C2Config::LEVEL_AVC_2, C2Config::LEVEL_AVC_2_1, C2Config::LEVEL_AVC_2_2,
++                            C2Config::LEVEL_AVC_3, C2Config::LEVEL_AVC_3_1, C2Config::LEVEL_AVC_3_2,
++                            C2Config::LEVEL_AVC_4, C2Config::LEVEL_AVC_4_1, C2Config::LEVEL_AVC_4_2,
++                            C2Config::LEVEL_AVC_5, C2Config::LEVEL_AVC_5_1, C2Config::LEVEL_AVC_5_2
++                    })
++                })
++                .withSetter(ProfileLevelSetter, mSize)
++                .build());
++    }
++
++    else if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_VIDEO_HEVC) == 0) {
++        addParameter(
++                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
++                .withDefault(new C2PortActualDelayTuning::output(8u))
++                .withFields({C2F(mActualOutputDelay, value).inRange(0, 34u)})
++                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
++                .build());
++
++        addParameter(
++                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
++                .withDefault(new C2StreamProfileLevelInfo::input(0u,
++                        C2Config::PROFILE_HEVC_MAIN, C2Config::LEVEL_HEVC_MAIN_5_1))
++                .withFields({
++                    C2F(mProfileLevel, profile).oneOf({
++                            C2Config::PROFILE_HEVC_MAIN,
++                            C2Config::PROFILE_HEVC_MAIN_STILL}),
++                    C2F(mProfileLevel, level).oneOf({
++                            C2Config::LEVEL_HEVC_MAIN_1,
++                            C2Config::LEVEL_HEVC_MAIN_2, C2Config::LEVEL_HEVC_MAIN_2_1,
++                            C2Config::LEVEL_HEVC_MAIN_3, C2Config::LEVEL_HEVC_MAIN_3_1,
++                            C2Config::LEVEL_HEVC_MAIN_4, C2Config::LEVEL_HEVC_MAIN_4_1,
++                            C2Config::LEVEL_HEVC_MAIN_5, C2Config::LEVEL_HEVC_MAIN_5_1,
++                            C2Config::LEVEL_HEVC_MAIN_5_2, C2Config::LEVEL_HEVC_HIGH_4,
++                            C2Config::LEVEL_HEVC_HIGH_4_1, C2Config::LEVEL_HEVC_HIGH_5,
++                            C2Config::LEVEL_HEVC_HIGH_5_1, C2Config::LEVEL_HEVC_HIGH_5_2
++                    })
++                })
++                .withSetter(ProfileLevelSetter, mSize)
++                .build());
++    }
++
++    else {
++        int nthreads = base::GetIntProperty("debug.ffmpeg-codec2.threads", 0);
++
++        if (nthreads <= 0) {
++            nthreads = std::thread::hardware_concurrency();
++        }
++
++        addParameter(
++                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
++                .withConstValue(new C2PortActualDelayTuning::output(2 * nthreads))
++                .build());
++
++        if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_VIDEO_VP9) == 0) {
++            addParameter(
++                    DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
++                    .withDefault(new C2StreamProfileLevelInfo::input(0u,
++                            C2Config::PROFILE_VP9_0, C2Config::LEVEL_VP9_5))
++                    .withFields({
++                        C2F(mProfileLevel, profile).oneOf({
++                                C2Config::PROFILE_VP9_0,
++                                C2Config::PROFILE_VP9_2}),
++                        C2F(mProfileLevel, level).oneOf({
++                                C2Config::LEVEL_VP9_1,
++                                C2Config::LEVEL_VP9_1_1,
++                                C2Config::LEVEL_VP9_2,
++                                C2Config::LEVEL_VP9_2_1,
++                                C2Config::LEVEL_VP9_3,
++                                C2Config::LEVEL_VP9_3_1,
++                                C2Config::LEVEL_VP9_4,
++                                C2Config::LEVEL_VP9_4_1,
++                                C2Config::LEVEL_VP9_5,
++                        })
++                    })
++                    .withSetter(ProfileLevelSetter, mSize)
++                    .build());
++        }
++    }
++
++    C2ChromaOffsetStruct locations[1] = { C2ChromaOffsetStruct::ITU_YUV_420_0() };
++    std::shared_ptr<C2StreamColorInfo::output> defaultColorInfo =
++        C2StreamColorInfo::output::AllocShared(
++                1u, 0u, 8u /* bitDepth */, C2Color::YUV_420);
++    memcpy(defaultColorInfo->m.locations, locations, sizeof(locations));
++
++    defaultColorInfo =
++        C2StreamColorInfo::output::AllocShared(
++                { C2ChromaOffsetStruct::ITU_YUV_420_0() },
++                0u, 8u /* bitDepth */, C2Color::YUV_420);
++    helper->addStructDescriptors<C2ChromaOffsetStruct>();
++
++    addParameter(
++            DefineParam(mColorInfo, C2_PARAMKEY_CODED_COLOR_INFO)
++            .withConstValue(defaultColorInfo)
++            .build());
++
++    addParameter(
++            DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
++            .withConstValue(new C2StreamPixelFormatInfo::output(
++                                 0u, HAL_PIXEL_FORMAT_YV12))
++            .build());
++
++    addParameter(
++            DefineParam(mRawCodecData, C2_PARAMKEY_RAW_CODEC_DATA)
++            .withDefault(C2StreamRawCodecDataInfo::input::AllocShared(0, 0u))
++            .withFields({C2F(mRawCodecData, m.value)})
++            .withSetter(CodecSetter)
++            .build());
++}
++
++C2R C2FFMPEGVideoDecodeInterface::SizeSetter(
++        bool /* mayBlock */,
++        const C2P<C2StreamPictureSizeInfo::output> &oldMe,
++        C2P<C2StreamPictureSizeInfo::output> &me) {
++    C2R res = C2R::Ok();
++
++    if (!me.F(me.v.width).supportsAtAll(me.v.width)) {
++        res = res.plus(C2SettingResultBuilder::BadValue(me.F(me.v.width)));
++        me.set().width = oldMe.v.width;
++    }
++    if (!me.F(me.v.height).supportsAtAll(me.v.height)) {
++        res = res.plus(C2SettingResultBuilder::BadValue(me.F(me.v.height)));
++        me.set().height = oldMe.v.height;
++    }
++
++    return res;
++}
++
++C2R C2FFMPEGVideoDecodeInterface::ProfileLevelSetter(
++        bool /* mayBlock */,
++        C2P<C2StreamProfileLevelInfo::input>& /* me */,
++        const C2P<C2StreamPictureSizeInfo::output>& /* size */) {
++    return C2R::Ok();
++}
++
++C2R C2FFMPEGVideoDecodeInterface::CodecSetter(
++        bool mayBlock __unused, C2P<C2StreamRawCodecDataInfo::input>& me __unused) {
++    return C2R::Ok();
++}
++
++const FFMPEGVideoCodecInfo* C2FFMPEGVideoDecodeInterface::getCodecInfo() const {
++    if (mRawCodecData->flexCount() == sizeof(FFMPEGVideoCodecInfo)) {
++        return (const FFMPEGVideoCodecInfo*)mRawCodecData->m.value;
++    }
++    return nullptr;
++}
++
++} // namespace android
+diff --git a/codec2/C2FFMPEGVideoDecodeInterface.h b/codec2/C2FFMPEGVideoDecodeInterface.h
+new file mode 100644
+index 0000000..8654c05
+--- /dev/null
++++ b/codec2/C2FFMPEGVideoDecodeInterface.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef C2_FFMPEG_VIDEO_DECODE_INTERFACE_H
++#define C2_FFMPEG_VIDEO_DECODE_INTERFACE_H
++
++#include <SimpleC2Interface.h>
++#include "C2FFMPEGCommon.h"
++#include "codec_utils.h"
++
++namespace android {
++
++class C2FFMPEGVideoDecodeInterface : public SimpleInterface<void>::BaseParams {
++public:
++    explicit C2FFMPEGVideoDecodeInterface(
++        const C2FFMPEGComponentInfo* componentInfo,
++        const std::shared_ptr<C2ReflectorHelper>& helper);
++
++    uint32_t getWidth() const { return mSize->width; }
++    uint32_t getHeight() const { return mSize->height; }
++    const FFMPEGVideoCodecInfo* getCodecInfo() const;
++    const std::shared_ptr<C2StreamPixelFormatInfo::output>&
++        getPixelFormatInfo() const { return mPixelFormat; }
++    uint32_t getOutputDelay() const { return mActualOutputDelay->value; }
++
++private:
++    static C2R SizeSetter(
++        bool mayBlock,
++        const C2P<C2StreamPictureSizeInfo::output> &oldMe,
++        C2P<C2StreamPictureSizeInfo::output> &me);
++    static C2R ProfileLevelSetter(
++        bool mayBlock,
++        C2P<C2StreamProfileLevelInfo::input> &me,
++        const C2P<C2StreamPictureSizeInfo::output> &size);
++    static C2R CodecSetter(
++        bool mayBlock, C2P<C2StreamRawCodecDataInfo::input>& me);
++
++private:
++    std::shared_ptr<C2StreamPictureSizeInfo::output> mSize;
++    std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;
++    std::shared_ptr<C2StreamColorInfo::output> mColorInfo;
++    std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
++    std::shared_ptr<C2StreamRawCodecDataInfo::input> mRawCodecData;
++};
++
++} // namespace android
++
++#endif // C2_FFMPEG_VIDEO_DECODE_INTERFACE_H
+diff --git a/codec2/android.hardware.media.c2@1.2-ffmpeg-service.rc b/codec2/android.hardware.media.c2@1.2-ffmpeg-service.rc
+new file mode 100644
+index 0000000..9cb84a2
+--- /dev/null
++++ b/codec2/android.hardware.media.c2@1.2-ffmpeg-service.rc
+@@ -0,0 +1,22 @@
++#
++# Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++
++service android-hardware-media-c2-hal-1-2 /vendor/bin/hw/android.hardware.media.c2@1.2-ffmpeg-service
++    class hal
++    user mediacodec
++    group camera mediadrm drmrpc
++    ioprio rt 4
++    task_profiles ProcessCapacityHigh
+diff --git a/codec2/manifest_media_c2_V1_2_ffmpeg.xml b/codec2/manifest_media_c2_V1_2_ffmpeg.xml
+new file mode 100644
+index 0000000..80afbc2
+--- /dev/null
++++ b/codec2/manifest_media_c2_V1_2_ffmpeg.xml
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2022 Michael Goffioul <michael.goffioul@gmail.com>
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<manifest version="1.0" type="device">
++    <hal>
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.2</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>ffmpeg</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/codec2/media_codecs_ffmpeg_c2.xml b/codec2/media_codecs_ffmpeg_c2.xml
+new file mode 100644
+index 0000000..f083791
+--- /dev/null
++++ b/codec2/media_codecs_ffmpeg_c2.xml
+@@ -0,0 +1,163 @@
++<?xml version="1.0" encoding="utf-8" ?>
++<!-- Copyright (C) 2022 Michael Goffioul <michael.goffioul@gmail.com>
++            
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++                
++          http://www.apache.org/licenses/LICENSE-2.0
++            
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->         
++
++<MediaCodecs>
++    <Decoders>
++        <!-- audio codecs -->
++        <MediaCodec name="c2.ffmpeg.aac.decoder"    type="audio/mp4a-latm">
++            <Alias name="OMX.ffmpeg.aac.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.ac3.decoder"    type="audio/ac3" >
++            <Alias name="OMX.ffmpeg.ac3.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.alac.decoder"   type="audio/alac" >
++            <Alias name="OMX.ffmpeg.alac.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.ape.decoder"    type="audio/x-ape" >
++            <Alias name="OMX.ffmpeg.ape.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.atrial.decoder" type="audio/ffmpeg" >
++            <Alias name="OMX.ffmpeg.atrial.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.dts.decoder">
++            <Alias name="OMX.ffmpeg.dts.decoder" />
++            <Type name="audio/vnd.dts" />
++            <Type name="audio/dts" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.flac.decoder"   type="audio/flac" >
++            <Alias name="OMX.ffmpeg.flac.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.mp2.decoder"    type="audio/mpeg-L2">
++            <Alias name="OMX.ffmpeg.mp2.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.mp3.decoder"    type="audio/mpeg" >
++            <Alias name="OMX.ffmpeg.mp3.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.ra.decoder"     type="audio/vnd.rn-realaudio" >
++            <Alias name="OMX.ffmpeg.ra.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.vorbis.decoder" type="audio/vorbis" >
++            <Alias name="OMX.ffmpeg.vorbisac3.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.wma.decoder"    type="audio/x-ms-wma" >
++            <Alias name="OMX.ffmpeg.wma.decoder" />
++            <Limit name="channel-count" max="8" />
++            <Limit name="sample-rate" ranges="8000-192000" />
++        </MediaCodec>
++
++        <!-- video codecs -->
++        <MediaCodec name="c2.ffmpeg.divx.decoder"   type="video/divx">
++            <Alias name="OMX.ffmpeg.divx.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.flv1.decoder"   type="video/x-flv">
++            <Alias name="OMX.ffmpeg.flv1.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.h263.decoder"   type="video/3gpp">
++            <Alias name="OMX.ffmpeg.h263.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.h264.decoder"   type="video/avc">
++            <Alias name="OMX.ffmpeg.h264.decoder" />
++            <Limit name="size" min="2x2" max="4080x4080" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.hevc.decoder"   type="video/hevc">
++            <Alias name="OMX.ffmpeg.hevc.decoder" />
++            <Limit name="size" min="2x2" max="4096x4096" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.mpeg2.decoder"  type="video/mpeg2">
++            <Alias name="OMX.ffmpeg.mpeg2.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.mpeg4.decoder"  type="video/mp4v-es">
++            <Alias name="OMX.ffmpeg.mpeg4.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.rv.decoder"     type="video/vnd.rn-realvideo">
++            <Alias name="OMX.ffmpeg.rv.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.vc1.decoder"    type="video/vc1">
++            <Alias name="OMX.ffmpeg.vc1.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.vp8.decoder"    type="video/x-vnd.on2.vp8">
++            <Alias name="OMX.ffmpeg.vp8.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.vp9.decoder"    type="video/x-vnd.on2.vp9">
++            <Alias name="OMX.ffmpeg.vp9.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.vtrial.decoder" type="video/ffmpeg">
++            <Alias name="OMX.ffmpeg.vtrial.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++        <MediaCodec name="c2.ffmpeg.wmv.decoder"    type="video/x-ms-wmv">
++            <Alias name="OMX.ffmpeg.wmv.decoder" />
++            <Limit name="size" min="2x2" max="2048x2048" />
++            <Limit name="alignment" value="2x2" />
++            <Feature name="adaptive-playback" />
++        </MediaCodec>
++    </Decoders>
++</MediaCodecs>
+diff --git a/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm.policy b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm.policy
+new file mode 100644
+index 0000000..9042cd7
+--- /dev/null
++++ b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm.policy
+@@ -0,0 +1,86 @@
++# Copyright (C) 2019 The Android Open Source Project
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++futex: 1
++# ioctl calls are filtered via the selinux policy.
++ioctl: 1
++sched_yield: 1
++close: 1
++dup: 1
++ppoll: 1
++mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
++mmap2: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
++memfd_create: 1
++ftruncate: 1
++ftruncate64: 1
++
++# mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail
++# parser support for '<' is in this needs to be modified to also prevent
++# |old_address| and |new_address| from touching the exception vector page, which
++# on ARM is statically loaded at 0xffff 0000. See
++# http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0211h/Babfeega.html
++# for more details.
++mremap: arg3 == 3
++munmap: 1
++prctl: 1
++getuid32: 1
++writev: 1
++sigaltstack: 1
++clone: 1
++exit: 1
++lseek: 1
++rt_sigprocmask: 1
++openat: 1
++open: 1
++fstat64: 1
++write: 1
++nanosleep: 1
++setpriority: 1
++set_tid_address: 1
++getdents64: 1
++readlinkat: 1
++readlink: 1
++read: 1
++pread64: 1
++fstatfs64: 1
++gettimeofday: 1
++faccessat: 1
++_llseek: 1
++fstatat64: 1
++ugetrlimit: 1
++exit_group: 1
++restart_syscall: 1
++rt_sigreturn: 1
++getrandom: 1
++madvise: 1
++
++# crash dump policy additions
++sigreturn: 1
++clock_gettime: 1
++futex: 1
++getpid: 1
++gettid: 1
++pipe2: 1
++recvmsg: 1
++process_vm_readv: 1
++tgkill: 1
++rt_sigaction: 1
++rt_tgsigqueueinfo: 1
++#prctl: arg0 == PR_GET_NO_NEW_PRIVS || arg0 == 0x53564d41
++#mprotect: arg2 in 0x1|0x2
++#mmap2: arg2 in 0x1|0x2
++geteuid32: 1
++getgid32: 1
++getegid32: 1
++getgroups32: 1
+diff --git a/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm64.policy b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm64.policy
+new file mode 100644
+index 0000000..5d0284f
+--- /dev/null
++++ b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-arm64.policy
+@@ -0,0 +1,81 @@
++# Copyright (C) 2021 The Android Open Source Project
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++futex: 1
++# ioctl calls are filtered via the selinux policy.
++ioctl: 1
++sched_yield: 1
++close: 1
++dup: 1
++ppoll: 1
++mprotect: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
++mmap: arg2 in ~PROT_EXEC || arg2 in ~PROT_WRITE
++getuid: 1
++getrlimit: 1
++fstat: 1
++newfstatat: 1
++fstatfs: 1
++memfd_create: 1
++ftruncate: 1
++
++# mremap: Ensure |flags| are (MREMAP_MAYMOVE | MREMAP_FIXED) TODO: Once minijail
++# parser support for '<' is in this needs to be modified to also prevent
++# |old_address| and |new_address| from touching the exception vector page, which
++# on ARM is statically loaded at 0xffff 0000. See
++# http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0211h/Babfeega.html
++# for more details.
++mremap: arg3 == 3 || arg3 == MREMAP_MAYMOVE
++munmap: 1
++prctl: 1
++writev: 1
++sigaltstack: 1
++clone: 1
++exit: 1
++lseek: 1
++rt_sigprocmask: 1
++openat: 1
++write: 1
++nanosleep: 1
++setpriority: 1
++set_tid_address: 1
++getdents64: 1
++readlinkat: 1
++read: 1
++pread64: 1
++gettimeofday: 1
++faccessat: 1
++exit_group: 1
++restart_syscall: 1
++rt_sigreturn: 1
++getrandom: 1
++madvise: 1
++
++# crash dump policy additions
++clock_gettime: 1
++getpid: 1
++gettid: 1
++pipe2: 1
++recvmsg: 1
++process_vm_readv: 1
++tgkill: 1
++rt_sigaction: 1
++rt_tgsigqueueinfo: 1
++#mprotect: arg2 in 0x1|0x2
++munmap: 1
++#mmap: arg2 in 0x1|0x2
++geteuid: 1
++getgid: 1
++getegid: 1
++getgroups: 1
++
+diff --git a/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86.policy b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86.policy
+new file mode 100644
+index 0000000..a7b2049
+--- /dev/null
++++ b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86.policy
+@@ -0,0 +1,75 @@
++# Copyright (C) 2021 The Android Open Source Project
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++read: 1
++mprotect: 1
++prctl: 1
++openat: 1
++open: 1
++getuid32: 1
++getuid: 1
++getrlimit: 1
++writev: 1
++ioctl: 1
++close: 1
++mmap2: 1
++mmap: 1
++fstat64: 1
++fstat: 1
++stat64: 1
++statfs64: 1
++madvise: 1
++fstatat64: 1
++newfstatat: 1
++futex: 1
++munmap: 1
++faccessat: 1
++_llseek: 1
++lseek: 1
++clone: 1
++sigaltstack: 1
++setpriority: 1
++restart_syscall: 1
++exit: 1
++exit_group: 1
++rt_sigreturn: 1
++ugetrlimit: 1
++readlink: 1
++readlinkat: 1
++_llseek: 1
++fstatfs64: 1
++fstatfs: 1
++pread64: 1
++mremap: 1
++dup: 1
++set_tid_address: 1
++write: 1
++nanosleep: 1
++sched_setscheduler: 1
++uname: 1
++memfd_create: 1
++ftruncate: 1
++ftruncate64: 1
++
++# Required by AddressSanitizer
++gettid: 1
++sched_yield: 1
++getpid: 1
++gettid: 1
++
++# Required fy FFMPEG
++sched_getaffinity: 1
++kcmp: 1
++
++@include /system/etc/seccomp_policy/crash_dump.x86.policy
+diff --git a/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86_64.policy b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86_64.policy
+new file mode 100644
+index 0000000..16d1350
+--- /dev/null
++++ b/codec2/seccomp_policy/android.hardware.media.c2@1.2-ffmpeg-x86_64.policy
+@@ -0,0 +1,75 @@
++# Copyright (C) 2021 The Android Open Source Project
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++read: 1
++mprotect: 1
++prctl: 1
++openat: 1
++open: 1
++getuid32: 1
++getuid: 1
++getrlimit: 1
++writev: 1
++ioctl: 1
++close: 1
++mmap2: 1
++mmap: 1
++fstat64: 1
++fstat: 1
++stat64: 1
++statfs64: 1
++madvise: 1
++fstatat64: 1
++newfstatat: 1
++futex: 1
++munmap: 1
++faccessat: 1
++_llseek: 1
++lseek: 1
++clone: 1
++sigaltstack: 1
++setpriority: 1
++restart_syscall: 1
++exit: 1
++exit_group: 1
++rt_sigreturn: 1
++ugetrlimit: 1
++readlink: 1
++readlinkat: 1
++_llseek: 1
++fstatfs64: 1
++fstatfs: 1
++pread64: 1
++mremap: 1
++dup: 1
++set_tid_address: 1
++write: 1
++nanosleep: 1
++sched_setscheduler: 1
++uname: 1
++memfd_create: 1
++ftruncate: 1
++ftruncate64: 1
++
++# Required by AddressSanitizer
++gettid: 1
++sched_yield: 1
++getpid: 1
++gettid: 1
++
++# Required fy FFMPEG
++sched_getaffinity: 1
++kcmp: 1
++
++@include /system/etc/seccomp_policy/crash_dump.x86_64.policy
+diff --git a/codec2/service.cpp b/codec2/service.cpp
+new file mode 100644
+index 0000000..8391b92
+--- /dev/null
++++ b/codec2/service.cpp
+@@ -0,0 +1,322 @@
++/*
++ * Copyright 2022 Michael Goffioul <michael.goffioul@gmail.com>
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++//#define LOG_NDEBUG 0
++#define LOG_TAG "android.hardware.media.c2@1.2-service"
++
++#include <android-base/logging.h>
++#include <android-base/properties.h>
++#include <binder/ProcessState.h>
++#include <codec2/hidl/1.2/ComponentStore.h>
++#include <hidl/HidlTransportSupport.h>
++#include <minijail.h>
++
++#include <util/C2InterfaceHelper.h>
++#include <C2Component.h>
++#include <C2Config.h>
++
++#include "C2FFMPEGCommon.h"
++#include "C2FFMPEGAudioDecodeComponent.h"
++#include "C2FFMPEGAudioDecodeInterface.h"
++#include "C2FFMPEGVideoDecodeComponent.h"
++#include "C2FFMPEGVideoDecodeInterface.h"
++
++namespace android {
++
++// This is the absolute on-device path of the prebuild_etc module
++// "android.hardware.media.c2@1.1-ffmpeg-seccomp_policy" in Android.bp.
++static constexpr char kBaseSeccompPolicyPath[] =
++        "/vendor/etc/seccomp_policy/"
++        "android.hardware.media.c2@1.2-ffmpeg.policy";
++
++// Additional seccomp permissions can be added in this file.
++// This file does not exist by default.
++static constexpr char kExtSeccompPolicyPath[] =
++        "/vendor/etc/seccomp_policy/"
++        "android.hardware.media.c2@1.2-ffmpeg-extended.policy";
++
++static const C2FFMPEGComponentInfo kFFMPEGVideoComponents[] = {
++    { "c2.ffmpeg.divx.decoder"  , MEDIA_MIMETYPE_VIDEO_DIVX  , AV_CODEC_ID_MPEG4      },
++    { "c2.ffmpeg.flv1.decoder"  , MEDIA_MIMETYPE_VIDEO_FLV1  , AV_CODEC_ID_FLV1       },
++    { "c2.ffmpeg.h263.decoder"  , MEDIA_MIMETYPE_VIDEO_H263  , AV_CODEC_ID_H263       },
++    { "c2.ffmpeg.hevc.decoder"  , MEDIA_MIMETYPE_VIDEO_HEVC  , AV_CODEC_ID_HEVC       },
++    { "c2.ffmpeg.h264.decoder"  , MEDIA_MIMETYPE_VIDEO_AVC   , AV_CODEC_ID_H264       },
++    { "c2.ffmpeg.mpeg2.decoder" , MEDIA_MIMETYPE_VIDEO_MPEG2 , AV_CODEC_ID_MPEG2VIDEO },
++    { "c2.ffmpeg.mpeg4.decoder" , MEDIA_MIMETYPE_VIDEO_MPEG4 , AV_CODEC_ID_MPEG4      },
++    { "c2.ffmpeg.rv.decoder"    , MEDIA_MIMETYPE_VIDEO_RV    , AV_CODEC_ID_RV40       },
++    { "c2.ffmpeg.vc1.decoder"   , MEDIA_MIMETYPE_VIDEO_VC1   , AV_CODEC_ID_VC1        },
++    { "c2.ffmpeg.vp8.decoder"   , MEDIA_MIMETYPE_VIDEO_VP8   , AV_CODEC_ID_VP8        },
++    { "c2.ffmpeg.vp9.decoder"   , MEDIA_MIMETYPE_VIDEO_VP9   , AV_CODEC_ID_VP9        },
++    { "c2.ffmpeg.vtrial.decoder", MEDIA_MIMETYPE_VIDEO_FFMPEG, AV_CODEC_ID_NONE       },
++    { "c2.ffmpeg.wmv.decoder"   , MEDIA_MIMETYPE_VIDEO_WMV   , AV_CODEC_ID_WMV2       },
++};
++
++static const size_t kNumVideoComponents =
++    (sizeof(kFFMPEGVideoComponents) / sizeof(kFFMPEGVideoComponents[0]));
++
++static const C2FFMPEGComponentInfo kFFMPEGAudioComponents[] = {
++    { "c2.ffmpeg.aac.decoder"   , MEDIA_MIMETYPE_AUDIO_AAC          , AV_CODEC_ID_AAC    },
++    { "c2.ffmpeg.ac3.decoder"   , MEDIA_MIMETYPE_AUDIO_AC3          , AV_CODEC_ID_AC3    },
++    { "c2.ffmpeg.alac.decoder"  , MEDIA_MIMETYPE_AUDIO_ALAC         , AV_CODEC_ID_ALAC   },
++    { "c2.ffmpeg.ape.decoder"   , MEDIA_MIMETYPE_AUDIO_APE          , AV_CODEC_ID_APE    },
++    { "c2.ffmpeg.atrial.decoder", MEDIA_MIMETYPE_AUDIO_FFMPEG       , AV_CODEC_ID_NONE   },
++    { "c2.ffmpeg.dts.decoder"   , MEDIA_MIMETYPE_AUDIO_DTS          , AV_CODEC_ID_DTS    },
++    { "c2.ffmpeg.flac.decoder"  , MEDIA_MIMETYPE_AUDIO_FLAC         , AV_CODEC_ID_FLAC   },
++    { "c2.ffmpeg.mp2.decoder"   , MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II, AV_CODEC_ID_MP2    },
++    { "c2.ffmpeg.mp3.decoder"   , MEDIA_MIMETYPE_AUDIO_MPEG         , AV_CODEC_ID_MP3    },
++    { "c2.ffmpeg.ra.decoder"    , MEDIA_MIMETYPE_AUDIO_RA           , AV_CODEC_ID_COOK   },
++    { "c2.ffmpeg.vorbis.decoder", MEDIA_MIMETYPE_AUDIO_VORBIS       , AV_CODEC_ID_VORBIS },
++    { "c2.ffmpeg.wma.decoder"   , MEDIA_MIMETYPE_AUDIO_WMA          , AV_CODEC_ID_WMAV2  },
++};
++
++static const size_t kNumAudioComponents =
++    (sizeof(kFFMPEGAudioComponents) / sizeof(kFFMPEGAudioComponents[0]));
++
++class StoreImpl : public C2ComponentStore {
++public:
++    StoreImpl()
++        : mReflectorHelper(std::make_shared<C2ReflectorHelper>()),
++          mInterface(mReflectorHelper) {
++    }
++
++    virtual ~StoreImpl() override = default;
++
++    virtual C2String getName() const override {
++        return "ffmpeg";
++    }
++
++    virtual c2_status_t createComponent(
++            C2String name,
++            std::shared_ptr<C2Component>* const component) override {
++        ALOGD("createComponent: %s", name.c_str());
++        for (int i = 0; i < kNumAudioComponents; i++) {
++            auto info = &kFFMPEGAudioComponents[i];
++            if (name == info->name) {
++                component->reset();
++                *component = std::shared_ptr<C2Component>(
++                        new C2FFMPEGAudioDecodeComponent(
++                                info, std::make_shared<C2FFMPEGAudioDecodeInterface>(info, mReflectorHelper)));
++                return C2_OK;
++            }
++        }
++        for (int i = 0; i < kNumVideoComponents; i++) {
++            auto info = &kFFMPEGVideoComponents[i];
++            if (name == info->name) {
++                component->reset();
++                *component = std::shared_ptr<C2Component>(
++                        new C2FFMPEGVideoDecodeComponent(
++                                info, std::make_shared<C2FFMPEGVideoDecodeInterface>(info, mReflectorHelper)));
++                return C2_OK;
++            }
++        }
++        return C2_NOT_FOUND;
++    }
++
++    virtual c2_status_t createInterface(
++            C2String name,
++            std::shared_ptr<C2ComponentInterface>* const interface) override {
++        ALOGD("createInterface: %s", name.c_str());
++        for (int i = 0; i < kNumAudioComponents; i++) {
++            auto info = &kFFMPEGAudioComponents[i];
++            if (name == info->name) {
++                interface->reset();
++                *interface = std::shared_ptr<C2ComponentInterface>(
++                        new SimpleInterface<C2FFMPEGAudioDecodeInterface>(
++                                info->name, 0, std::make_shared<C2FFMPEGAudioDecodeInterface>(info, mReflectorHelper)));
++                return C2_OK;
++            }
++        }
++        for (int i = 0; i < kNumVideoComponents; i++) {
++            auto info = &kFFMPEGVideoComponents[i];
++            if (name == info->name) {
++                interface->reset();
++                *interface = std::shared_ptr<C2ComponentInterface>(
++                        new SimpleInterface<C2FFMPEGVideoDecodeInterface>(
++                                info->name, 0, std::make_shared<C2FFMPEGVideoDecodeInterface>(info, mReflectorHelper)));
++                return C2_OK;
++            }
++        }
++        ALOGE("createInterface: unknown component = %s", name.c_str());
++        return C2_NOT_FOUND;
++    }
++
++    virtual std::vector<std::shared_ptr<const C2Component::Traits>>
++            listComponents() override {
++        ALOGD("listComponents");
++        std::vector<std::shared_ptr<const C2Component::Traits>> ret;
++        // FIXME: Prefer OMX codecs for the time being...
++        uint32_t defaultRank = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank", 0x110u);
++        uint32_t defaultRankAudio = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.audio", defaultRank);
++        uint32_t defaultRankVideo = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.video", defaultRank);
++        for (int i = 0; i < kNumAudioComponents; i++) {
++            auto traits = std::make_shared<C2Component::Traits>();
++            traits->name = kFFMPEGAudioComponents[i].name;
++            traits->domain = C2Component::DOMAIN_AUDIO;
++            traits->kind = C2Component::KIND_DECODER;
++            traits->mediaType = kFFMPEGAudioComponents[i].mediaType;
++            traits->rank = defaultRankAudio;
++            ret.push_back(traits);
++        }
++        for (int i = 0; i < kNumVideoComponents; i++) {
++            auto traits = std::make_shared<C2Component::Traits>();
++            traits->name = kFFMPEGVideoComponents[i].name;
++            traits->domain = C2Component::DOMAIN_VIDEO;
++            traits->kind = C2Component::KIND_DECODER;
++            traits->mediaType = kFFMPEGVideoComponents[i].mediaType;
++            traits->rank = defaultRankVideo;
++            ret.push_back(traits);
++        }
++        return ret;
++    }
++
++    virtual c2_status_t copyBuffer(
++            std::shared_ptr<C2GraphicBuffer> /* src */,
++            std::shared_ptr<C2GraphicBuffer> /* dst */) override {
++        return C2_OMITTED;
++    }
++
++    virtual c2_status_t query_sm(
++        const std::vector<C2Param*>& stackParams,
++        const std::vector<C2Param::Index>& heapParamIndices,
++        std::vector<std::unique_ptr<C2Param>>* const heapParams) const override {
++        return mInterface.query(stackParams, heapParamIndices, C2_MAY_BLOCK, heapParams);
++    }
++
++    virtual c2_status_t config_sm(
++            const std::vector<C2Param*>& params,
++            std::vector<std::unique_ptr<C2SettingResult>>* const failures) override {
++        return mInterface.config(params, C2_MAY_BLOCK, failures);
++    }
++
++    virtual std::shared_ptr<C2ParamReflector> getParamReflector() const override {
++        return mReflectorHelper;
++    }
++
++    virtual c2_status_t querySupportedParams_nb(
++            std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const override {
++        return mInterface.querySupportedParams(params);
++    }
++
++    virtual c2_status_t querySupportedValues_sm(
++            std::vector<C2FieldSupportedValuesQuery>& fields) const override {
++        return mInterface.querySupportedValues(fields, C2_MAY_BLOCK);
++    }
++
++private:
++    class Interface : public C2InterfaceHelper {
++    public:
++        Interface(const std::shared_ptr<C2ReflectorHelper> &helper)
++            : C2InterfaceHelper(helper) {
++            setDerivedInstance(this);
++
++            addParameter(
++                DefineParam(mIonUsageInfo, "ion-usage")
++                .withDefault(new C2StoreIonUsageInfo())
++                .withFields({
++                    C2F(mIonUsageInfo, usage).flags(
++                            {C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE}),
++                    C2F(mIonUsageInfo, capacity).inRange(0, UINT32_MAX, 1024),
++                    C2F(mIonUsageInfo, heapMask).any(),
++                    C2F(mIonUsageInfo, allocFlags).flags({}),
++                    C2F(mIonUsageInfo, minAlignment).equalTo(0)
++                })
++                .withSetter(SetIonUsage)
++                .build());
++
++            addParameter(
++                DefineParam(mDmaBufUsageInfo, "dmabuf-usage")
++                .withDefault(C2StoreDmaBufUsageInfo::AllocUnique(0))
++                .withFields({
++                    C2F(mDmaBufUsageInfo, m.usage).flags({C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE}),
++                    C2F(mDmaBufUsageInfo, m.capacity).inRange(0, UINT32_MAX, 1024),
++                    C2F(mDmaBufUsageInfo, m.heapName).any(),
++                    C2F(mDmaBufUsageInfo, m.allocFlags).flags({}),
++                })
++                .withSetter(SetDmaBufUsage)
++                .build());
++        }
++
++        virtual ~Interface() = default;
++
++    private:
++        static C2R SetIonUsage(bool /* mayBlock */, C2P<C2StoreIonUsageInfo> &me) {
++            // Vendor's TODO: put appropriate mapping logic
++            me.set().heapMask = ~0;
++            me.set().allocFlags = 0;
++            me.set().minAlignment = 0;
++            return C2R::Ok();
++        }
++
++        static C2R SetDmaBufUsage(bool /* mayBlock */, C2P<C2StoreDmaBufUsageInfo> &me) {
++            // Vendor's TODO: put appropriate mapping logic
++            strncpy(me.set().m.heapName, "system", me.v.flexCount());
++            me.set().m.allocFlags = 0;
++            return C2R::Ok();
++        }
++
++
++        std::shared_ptr<C2StoreIonUsageInfo> mIonUsageInfo;
++        std::shared_ptr<C2StoreDmaBufUsageInfo> mDmaBufUsageInfo;
++    };
++    std::shared_ptr<C2ReflectorHelper> mReflectorHelper;
++    Interface mInterface;
++};
++
++} // namespace android
++
++int main(int /* argc */, char** /* argv */) {
++    using namespace ::android;
++    LOG(DEBUG) << "android.hardware.media.c2@1.2-service starting...";
++
++    // Set up minijail to limit system calls.
++    signal(SIGPIPE, SIG_IGN);
++    SetUpMinijail(kBaseSeccompPolicyPath, kExtSeccompPolicyPath);
++
++    ProcessState::self()->startThreadPool();
++    // Extra threads may be needed to handle a stacked IPC sequence that
++    // contains alternating binder and hwbinder calls. (See b/35283480.)
++    hardware::configureRpcThreadpool(8, true /* callerWillJoin */);
++
++    // Create IComponentStore service.
++    {
++        using namespace ::android::hardware::media::c2::V1_2;
++        sp<IComponentStore> store;
++
++        // TODO: Replace this with
++        // store = new utils::ComponentStore(
++        //         /* implementation of C2ComponentStore */);
++        LOG(DEBUG) << "Instantiating Codec2's IComponentStore service...";
++        store = new utils::ComponentStore(
++                std::make_shared<StoreImpl>());
++
++        if (store == nullptr) {
++            LOG(ERROR) << "Cannot create Codec2's IComponentStore service.";
++        } else {
++            constexpr char const* serviceName = "ffmpeg";
++            if (store->registerAsService(serviceName) != OK) {
++                LOG(ERROR) << "Cannot register Codec2's IComponentStore service"
++                              " with instance name << \""
++                           << serviceName << "\".";
++            } else {
++                LOG(DEBUG) << "Codec2's IComponentStore service registered. "
++                              "Instance name: \"" << serviceName << "\".";
++            }
++        }
++    }
++
++    hardware::joinRpcThreadpool();
++    return 0;
++}
+diff --git a/extractor/FFmpegExtractor.cpp b/extractor/FFmpegExtractor.cpp
+index 2876588..2c84933 100644
+--- a/extractor/FFmpegExtractor.cpp
++++ b/extractor/FFmpegExtractor.cpp
+@@ -15,6 +15,7 @@
+  * limitations under the License.
+  */
+ 
++//#define LOG_NDEBUG 0
+ #define LOG_TAG "FFmpegExtractor"
+ #include <utils/Log.h>
+ 
+@@ -431,7 +432,7 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
+         if (avpar->extradata_size > 0) {
+             AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
+         }
+-        //CHECK(!"Should not be here. Unsupported codec.");
++        ret = AMEDIA_OK;
+         break;
+     }
+ 
+@@ -485,6 +486,12 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
+         }
+         AMediaFormat_setString(meta, "file-format", findMatchingContainer(mFormatCtx->iformat->name));
+         setDurationMetaData(stream, meta);
++
++        FFMPEGVideoCodecInfo info = {
++            .codec_id = avpar->codec_id,
++        };
++
++        AMediaFormat_setBuffer(meta, "raw-codec-data", &info, sizeof(info));
+     }
+ 
+     return AMEDIA_OK;
+@@ -550,7 +557,7 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
+         if (avpar->extradata_size > 0) {
+             AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
+         }
+-        //CHECK(!"Should not be here. Unsupported codec.");
++        ret = AMEDIA_OK;
+         break;
+     }
+ 
+@@ -574,6 +581,14 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
+         //AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING, sampleFormatToEncoding(avpar->sample_fmt));
+         AMediaFormat_setString(meta, "file-format", findMatchingContainer(mFormatCtx->iformat->name));
+         setDurationMetaData(stream, meta);
++
++        FFMPEGAudioCodecInfo info = {
++            .codec_id = avpar->codec_id,
++            .bits_per_coded_sample = avpar->bits_per_coded_sample,
++            .block_align = avpar->block_align,
++        };
++
++        AMediaFormat_setBuffer(meta, "raw-codec-data", &info, sizeof(info));
+     }
+ 
+     return AMEDIA_OK;
+diff --git a/utils/codec_utils.h b/utils/codec_utils.h
+index 8033b83..bd6e1ad 100644
+--- a/utils/codec_utils.h
++++ b/utils/codec_utils.h
+@@ -31,6 +31,17 @@ struct AMediaFormat;
+ 
+ namespace android {
+ 
++// Helper datastructures to pass extra information from extractor to codecs
++typedef struct {
++    int32_t codec_id;
++    int32_t bits_per_coded_sample;
++    int32_t block_align;
++} FFMPEGAudioCodecInfo;
++
++typedef struct {
++    int32_t codec_id;
++} FFMPEGVideoCodecInfo;
++
+ //video
+ media_status_t setAVCFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+ media_status_t setH264Format(AVCodecParameters *avpar, AMediaFormat *meta);
+diff --git a/utils/ffmpeg_source.cpp b/utils/ffmpeg_source.cpp
+index 3a2c931..bda6de8 100644
+--- a/utils/ffmpeg_source.cpp
++++ b/utils/ffmpeg_source.cpp
+@@ -14,6 +14,7 @@
+  * limitations under the License.
+  */
+ 
++//#define LOG_NDEBUG 0
+ #define LOG_TAG "FFMPEG"
+ #include <utils/Log.h>
+ 
+diff --git a/utils/ffmpeg_utils.h b/utils/ffmpeg_utils.h
+index 308a4df..4c15b49 100644
+--- a/utils/ffmpeg_utils.h
++++ b/utils/ffmpeg_utils.h
+@@ -38,6 +38,7 @@ extern "C" {
+ #else
+ #include "libswresample/swresample.h"
+ #endif
++#include "libavutil/opt.h"
+ 
+ #include <system/audio.h>
+ 

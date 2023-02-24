@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Tue, 3 Jan 2023 08:48:40 -0500
+Subject: [PATCH 2/3] Switch to bluetooth.audio@2.1 HIDL instead of
+ audio.a2dp.default
+
+It is a more recommend HAL to use nowadays since it provides more features,
+also from t-x86 we can't build audio.a2dp.default.
+
+Require android.hardware.bluetooth.audio@2.1-impl to be on PRODUCT_PACKAGES list
+and added on manifest.xml
+---
+ alsa.mk                        | 5 +++--
+ audio_policy_configuration.xml | 7 +++++--
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/alsa.mk b/alsa.mk
+index 2ef7602..d5cd06d 100644
+--- a/alsa.mk
++++ b/alsa.mk
+@@ -45,7 +45,8 @@ PRODUCT_COPY_FILES := \
+ 	$(foreach f,$(copy_init),$(LOCAL_ALSA_INIT_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/init/$(f)) \
+ 	$(LOCAL_PATH)/primary_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/primary_audio_policy_configuration.xml \
+ 	$(LOCAL_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+-	frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
++	frameworks/av/services/audiopolicy/config/a2dp_in_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_in_audio_policy_configuration.xml \
++	frameworks/av/services/audiopolicy/config/bluetooth_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth_audio_policy_configuration.xml \
+ 	frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+ 	frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+ 	frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+@@ -59,7 +60,7 @@ PRODUCT_PACKAGES := \
+ 	alsa_ucm \
+ 	audio.primary.x86 \
+ 	audio.primary.hdmi \
+-	audio.a2dp.default \
++	audio.bluetooth.default \
+ 	audio.usb.default \
+ 	audio_policy.default \
+ 	audio.r_submix.default \
+diff --git a/audio_policy_configuration.xml b/audio_policy_configuration.xml
+index a399a94..c79ad37 100644
+--- a/audio_policy_configuration.xml
++++ b/audio_policy_configuration.xml
+@@ -25,8 +25,11 @@
+         <!-- Primary Audio HAL -->
+         <xi:include href="primary_audio_policy_configuration.xml"/>
+ 
+-        <!-- A2dp Audio HAL -->
+-        <xi:include href="a2dp_audio_policy_configuration.xml"/>
++        <!-- A2dp Input Audio HAL -->
++        <xi:include href="a2dp_in_audio_policy_configuration.xml"/>
++
++        <!-- Bluetooth Audio HAL -->
++        <xi:include href="bluetooth_audio_policy_configuration.xml"/>
+ 
+         <!-- Usb Audio HAL -->
+         <xi:include href="usb_audio_policy_configuration.xml"/>
