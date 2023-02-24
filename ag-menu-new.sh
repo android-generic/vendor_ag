@@ -6,9 +6,12 @@ echo -e "SCRIPT_PATH: $SCRIPT_PATH"
 echo -e "rompath: $rompath"
 # rompath="$PWD"
 ag_vendor_path="$SCRIPT_PATH"
+export ag_vendor_path="$ag_vendor_path"
 temp_path="$ag_vendor_path/tmp"
+export temp_path="$ag_vendor_path/tmp"
 
 targetspath="$ag_vendor_path/targets"
+export targetspath="$ag_vendor_path/targets"
 
 # source $rompath/vendor/$ag_vendor_path/ag-core/gui/easybashgui
 
@@ -94,6 +97,7 @@ if [ "$CURRENT_TARGET_TYPE" == "" ]; then
     if [ -d "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
       echo "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" > $temp_path/$t-patches.cfg
       export CURRENT_${t}_PATCHES_PATH="$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION"
+      export CURRENT_TARGET_PATH="$targetspath/$t"
       # export CURRENT_${t}_MENU_PATH="$targetspath/$t/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json"
     else
       echo "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION was not found"
@@ -111,7 +115,7 @@ if [ "$CURRENT_TARGET_TYPE" == "" ]; then
         notify_message "Selected \"${i}\" ..."
         notify_change "${i}"			
         CURRENT_TARGET_TYPE="${i}"
-        bash $SCRIPT_PATH/core-menu/core-menu.sh -c $targetspath/$CURRENT_TARGET_TYPE/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json
+        bash $SCRIPT_PATH/core-menu/core-menu.sh -c $targetspath/$CURRENT_TARGET_TYPE/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json -d
       fi
     done
     if [ "${answer}" = "" ]; then

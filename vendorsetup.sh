@@ -1,5 +1,14 @@
 rompath=$(pwd)
-ag_vendor_path="ag"
+
+if [ ! "${ag_vendor_path}" ]; then
+	SCRIPT_PATH=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+	rompath="$(dirname "$SCRIPT_PATH")"
+	echo -e "SCRIPT_PATH: $SCRIPT_PATH"
+	echo -e "rompath: $rompath"
+	# rompath="$PWD"
+	ag_vendor_path="$SCRIPT_PATH"
+	export ag_vendor_path="$ag_vendor_path"
+fi
 
 function apply-x86-patches
 {

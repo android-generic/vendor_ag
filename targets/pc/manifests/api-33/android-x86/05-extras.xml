@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+    <!-- FOSS Apps -->
+    <project name="vendor_foss" path="vendor/foss" remote="sg" revision="hmchoice" />
+
+    <!-- Android-Generic Apps -->
+    <project name="android-generic/vendor_prebuilts_agp-apps" path="vendor/prebuilts/agp-apps" remote="gitlab" revision="master" />
+
+    <!-- Gearlock -->
+<!--
+    <project name="gearlock" path="vendor/gearlock" remote="axon" revision="main" />
+-->
+    <!-- aptX/aptX HD encoders-->
+    <project name="external_aosp_aptx" path="external/aosp_aptx" remote="sg" revision="master" />
+
+    <!-- HALs -->
+	<project path="external/thermal_daemon" name="thermal_daemon" remote="sg" revision="master" />
+	<project path="vendor/intel/hardware/interfaces" name="vendor-hardware-interfaces" remote="sg" revision="13-x86" />
+	<project path="hardware/intel/libbt-vendor" name="libbt-vendor-intel" remote="celadon" revision="master" />
+	<project path="hardware/intel/civ/thermal" name="device-intel-civ-thermal" remote="celadon" revision="master" />
+	<project path="hardware/intel/civ/battery" name="device-intel-civ-battery" remote="celadon" revision="master" />
+
+    <!-- BlissOS Projects -->
+    <project path="vendor/google/chromeos-x86" name="android_vendor_google_chromeos-x86.git" remote="blissroms-x86" revision="13816.82.0_hatch" />
+    <project path="vendor/google/emu-x86" name="android_vendor_google_emu-x86.git" remote="android-generic" revision="cce00e675942376cc78a99f64cc48205d1145dd4" />
+
+</manifest>

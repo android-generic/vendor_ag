@@ -1,82 +1,82 @@
 {
-    "project": "Android-Generic - PC Options",
-    "version": 0.1,
-    "updated": "2023-01-26T00:00:00.000Z",
-    "debug": true,
-    "options": {
-      "menuEntry": [
-        {
-          "name": "Generate Manifest",
-          "descr": "",
-          "command": "mkdir -p .repo/local_manifests && cp -p $CURRENT_pc_MANIFEST_PATH/*.xml .repo/local_manifests",
-          "dependencies": [
-            {
-              "dep": "ls -d .repo"
-            }
-          ]
-        },
-        {
-          "name": "Start Waydroid - Mutter",
-          "descr": "",
-          "command": "bash /usr/bin/mutter-session.sh",
-          "dependencies": [
-            {
-                "dep": "ls /usr/bin/mutter-session.sh"
-            }
-          ]
-        },
-        {
-          "name": "Start-Waydroid__Weston",
-          "descr": "",
-          "command": "bash /usr/bin/waydroid-session.sh",
-          "dependencies": [
-            {
-                "dep": "ls /usr/bin/waydroid-session.sh"
-            }
-          ]
-        },
-        {
-          "name": "Tools",
-          "descr": "",
-          "command": "",
-          "menuEntry": [
-            {
-              "name": "Setup Network",
-              "descr": "",
-              "command": "bash ~/.local/bin/easy-net-connect.sh",
-              "dependencies": [
-                {
-                    "dep": "ls ~/.local/bin/easy-net-connect.sh"
-                }
-              ]
-            },
-            {
-              "name": "Configure Waydroid Options",
-              "descr": "",
-              "command": "bash /usr/bin/configure_launch_type.sh",
-              "dependencies": [
-                {
-                    "dep": "ls /usr/bin/configure_launch_type.sh"
-                }
-              ]
-            },
-            {
-              "name": "Sleep",
-              "descr": "",
-              "command": "systemctl suspend"
-            },
-            {
-              "name": "reboot",
-              "descr": "",
-              "command": "reboot"
-            },
-            {
-              "name": "Shutdown",
-              "descr": "",
-              "command": "shutdown"
-            }
-          ]
-        }
-      ]
-    }
+  "project": "Android-Generic - PC Options",
+  "version": 0.1,
+  "updated": "2023-01-26T00:00:00.000Z",
+  "debug": true,
+  "options": {
+    "menuEntry": [
+      {
+        "name": "Generate Manifest",
+        "descr": "",
+        "command": "bash vendor/ag/targets/pc/scripts/api-33/generate-manifests/generate-manifests.sh pc", 
+        "dependencies": [
+          {
+            "dep": "ls -d .repo"
+          }
+        ]
+      },
+      {
+        "name": "Sync Generated Manifest",
+        "descr": "",
+        "command": "bash vendor/ag/targets/pc/scripts/api-33/sync-project/sync-project.sh",
+        "dependencies": [
+          {
+              "dep": "ls .repo/local_manifests/02-android-x86.xml"
+          }
+        ]
+      },
+      {
+        "name": "Start-Waydroid__Weston",
+        "descr": "",
+        "command": "bash /usr/bin/waydroid-session.sh",
+        "dependencies": [
+          {
+              "dep": "ls /usr/bin/waydroid-session.sh"
+          }
+        ]
+      },
+      {
+        "name": "Tools",
+        "descr": "",
+        "command": "",
+        "menuEntry": [
+          {
+            "name": "Setup Network",
+            "descr": "",
+            "command": "bash ~/.local/bin/easy-net-connect.sh",
+            "dependencies": [
+              {
+                  "dep": "ls ~/.local/bin/easy-net-connect.sh"
+              }
+            ]
+          },
+          {
+            "name": "Configure Waydroid Options",
+            "descr": "",
+            "command": "bash /usr/bin/configure_launch_type.sh",
+            "dependencies": [
+              {
+                  "dep": "ls /usr/bin/configure_launch_type.sh"
+              }
+            ]
+          },
+          {
+            "name": "Sleep",
+            "descr": "",
+            "command": "systemctl suspend"
+          },
+          {
+            "name": "reboot",
+            "descr": "",
+            "command": "reboot"
+          },
+          {
+            "name": "Shutdown",
+            "descr": "",
+            "command": "shutdown"
+          }
+        ]
+      }
+    ]
   }
+}

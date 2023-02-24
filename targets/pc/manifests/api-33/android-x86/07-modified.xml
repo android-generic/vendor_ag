@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+
+  <!-- General Repos -->
+  <project path="bionic" name="platform_bionic" remote="BlissBass" />
+  <project path="bootable/recovery" name="platform_bootable_recovery" remote="BlissBass" />
+  <project path="build/make" name="platform_build_make" remote="BlissBass" >
+    <copyfile src="core/root.mk" dest="Makefile" />
+    <linkfile src="CleanSpec.mk" dest="build/CleanSpec.mk" />
+    <linkfile src="buildspec.mk.default" dest="build/buildspec.mk.default" />
+    <linkfile src="core" dest="build/core" />
+    <linkfile src="envsetup.sh" dest="build/envsetup.sh" />
+    <linkfile src="target" dest="build/target" />
+    <linkfile src="tools" dest="build/tools" />
+  </project>
+  <project path="build/soong" name="platform_build_soong" remote="BlissBass" >
+    <linkfile src="root.bp" dest="Android.bp" />
+    <linkfile src="bootstrap.bash" dest="bootstrap.bash" />
+  </project>
+  <project path="bootable/newinstaller" name="platform_bootable_newinstaller" remote="BlissBass" />
+  <project path="development" name="platform_development" remote="BlissBass" />
+
+  <!-- External -->
+  <project path="external/ffmpeg" name="platform_external_ffmpeg" remote="BlissBass" />
+  <project path="external/libdrm" name="platform_external_libdrm" remote="BlissBass" />
+  <project path="external/minigbm" name="platform_external_minigbm" remote="BlissBass" />
+  <project path="external/mksh" name="platform_external_mksh" remote="BlissBass" />
+  <project path="external/stagefright-plugins" name="platform_external_stagefright-plugins" remote="BlissBass" />
+
+  <!-- Frameworks -->
+  <project path="frameworks/base" name="platform_frameworks_base" remote="BlissBass" />
+  <project path="frameworks/av" name="platform_frameworks_av" remote="BlissBass" />
+  <project path="frameworks/native" name="platform_frameworks_native" remote="BlissBass" />
+
+  <!-- Hardware -->
+  <project path="hardware/interfaces" name="platform_hardware_interfaces" remote="BlissBass" />
+  <project path="hardware/libaudio" name="platform_hardware_libaudio" remote="BlissBass" />
+  <project path="hardware/libsensors" name="platform_hardware_libsensors" remote="BlissBass" />
+
+  <!-- Modules -->
+  <project path="packages/modules/Bluetooth" name="platform_packages_modules_Bluetooth" remote="BlissBass" />
+
+  <!-- Packages -->
+  <project path="packages/apps/Settings" name="platform_packages_apps_Settings" remote="BlissBass" />
+  <project path="packages/apps/TSCalibration2" name="platform_packages_apps_TSCalibration2" remote="BlissBass" />
+
+  <!-- System -->
+  <project path="system/extras" name="platform_system_extras" remote="BlissBass" />
+  <project path="system/hardware" name="platform_system_hardware" remote="BlissBass" />
+  <project path="system/vold" name="platform_system_vold" groups="pdk" remote="BlissBass" />
+
+</manifest>

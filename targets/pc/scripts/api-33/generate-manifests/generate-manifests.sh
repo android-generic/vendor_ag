@@ -1,5 +1,6 @@
+#!/bin/bash
 #
-# Copyright (C) 2021 The Waydroid project
+# Copyright (C) 2023 Android-Generic Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,70 +21,58 @@ loc_man="${top_dir}/.repo/local_manifests"
 rompath="$PWD"
 vendor_path="ag"
 temp_path="$rompath/vendor/$vendor_path/tmp/"
-manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
-manifests_path="$rompath/vendor/$vendor_path/configs/pc"
 config_type="$1"
 popt=0
-source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+# source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+source $ag_vendor_path/core-menu/includes/easybashgui
 # include $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
 
-#setup colors
-red=`tput setaf 1`
-green=`tput setaf 2`
-yellow=`tput setaf 3`
-blue=`tput setaf 4`
-purple=`tput setaf 5`
-teal=`tput setaf 6`
-light=`tput setaf 7`
-dark=`tput setaf 8`
-ltred=`tput setaf 9`
-ltgreen=`tput setaf 10`
-ltyellow=`tput setaf 11`
-ltblue=`tput setaf 12`
-ltpurple=`tput setaf 13`
-CL_CYN=`tput setaf 12`
-CL_RST=`tput sgr0`
-reset=`tput sgr0`
+SCRIPT_PATH=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+rompath="$(dirname "$SCRIPT_PATH")"
+echo -e "SCRIPT_PATH: $SCRIPT_PATH"
+echo -e "rompath: $rompath"
+
+echo -e "ag_vendor_path: $ag_vendor_path"
+echo -e "temp_path: $temp_path"
+echo -e "targetspath: $targetspath"
+echo -e "CURRENT_pc_MANIFEST_PATH: $CURRENT_pc_MANIFEST_PATH"
+manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
+base_manifests_path="$CURRENT_pc_MANIFEST_PATH"
+echo -e "CURRENT_pc_PATCHES_PATH: $CURRENT_pc_PATCHES_PATH"
+echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
 
 echo -e "variables set"
 
-if [ ! -d "${top_dir}/.repo" ]; then
-    echo -e ${reset}""${reset}
-    echo -e ${ltred}"ERROR: Manifest generation requires repo to be initialized first."${reset}
-    echo -e ${reset}""${reset}
-    exit
-fi
 echo -e "Setting up local_manifests"
 mkdir -p ${loc_man}
 
-echo -e "determining proper paths for your Android version"
-if [ -f build/make/core/version_defaults.mk ]; then
-    if grep -q "PLATFORM_SDK_VERSION := 28" build/make/core/version_defaults.mk; then
-		echo -e "Setting up PLATFORM_SDK_VERSION := 28 local_manifests"
-        manifests_url="${manifests_url}-28"
-        manifests_path="${manifests_path}-28"
+# Parse available manifest options
+preManifestsString=()
+preManifestsString="$(cd $base_manifests_path && dirs=(*/); echo "${dirs[@]%/}" && cd $rompath)"
+
+echo -e "preManifestsString: $preManifestsString"
+manifestsStringArray=($preManifestsString)
+for m in $preManifestsString; do
+    manifestsString="$manifestsString $m"
+done
+echo -e "manifestsString: $manifestsString"
+
+while :
+do
+menu $manifestsString
+answer=$(0< "${dir_tmp}/${file_tmp}" )
+#
+for i in $manifestsString ; do
+    if [ "${answer}" = "${i}" ]; then
+    notify_message "Selected \"${i}\" ..."
+    notify_change "${i}"			
+    manifests_path="$base_manifests_path/${i}"
     fi
-    if grep -q "PLATFORM_SDK_VERSION := 29" build/make/core/version_defaults.mk; then
-		echo -e "Setting up PLATFORM_SDK_VERSION := 29 local_manifests"
-        manifests_url="${manifests_url}-29"
-        manifests_path="${manifests_path}-29"
-    fi
-    if grep -q "PLATFORM_SDK_VERSION := 30" build/make/core/version_defaults.mk; then
-		echo -e "Setting up PLATFORM_SDK_VERSION := 30 local_manifests"
-        manifests_url="${manifests_url}-30"
-        manifests_path="${manifests_path}-30"
-    fi
-    if grep -q "PLATFORM_SDK_VERSION := 31" build/make/core/version_defaults.mk; then
-		echo -e "Setting up PLATFORM_SDK_VERSION := 31 local_manifests"
-        manifests_url="${manifests_url}-31"
-        manifests_path="${manifests_path}-31"
-    fi
-    if grep -q "PLATFORM_SDK_VERSION := 32" build/make/core/version_defaults.mk; then
-		echo -e "Setting up PLATFORM_SDK_VERSION := 32 local_manifests"
-        manifests_url="${manifests_url}-32"
-        manifests_path="${manifests_path}-32"
-    fi
+done
+if [ "${answer}" = "" ]; then
+    exit
 fi
+done
 
 echo -e ${reset}""${reset}
 echo -e ${green}"Placing manifest fragments..."${reset}
