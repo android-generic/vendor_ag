@@ -1,13 +1,24 @@
 #!/bin/bash
-rompath="$PWD"
-vendor_path="ag"
-temp_path="$rompath/vendor/$vendor_path/tmp"
-config_type="$1"
-modulepath="$rompath/vendor/$vendor_path/scripts"
-privmodulepath="$rompath/vendor/$vendor_path/private-scripts"
+
 export supertitle="Android Generic Project - Build Options"
-export supericon="$rompath/vendor/$vendor_path/ag-core/includes/ag-logo.png"
-source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+export supericon="$source $ag_vendor_path/core-menu/includes/ag-logo.png"
+source $ag_vendor_path/core-menu/includes/easybashgui
+# include $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+
+# if [[ "$ag_debug" == "true" ]]; then
+echo -e "SCRIPT_PATH: $SCRIPT_PATH"
+echo -e "rompath: $rompath"
+echo -e "ag_vendor_path: $ag_vendor_path"
+echo -e "ag_temp_path: $ag_temp_path"
+echo -e "targetspath: $targetspath"
+echo -e "CURRENT_pc_MANIFEST_PATH: $CURRENT_pc_MANIFEST_PATH"
+echo -e "CURRENT_pc_PATCHES_PATH: $CURRENT_pc_PATCHES_PATH"
+echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
+# fi
+# manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
+base_manifests_path="$CURRENT_pc_MANIFEST_PATH"
+echo -e "variables set"
+
 
 #setup colors
 red=`tput setaf 1`
@@ -63,7 +74,7 @@ productType() {
 	echo "Timeout in $TMOUT sec."${CL_RST}
 	answer=$(0< "${dir_tmp}/${file_tmp}" )
 	product="${answer}"
-	echo -e ${product} > $temp_path/product.config
+	echo -e ${product} > $ag_temp_path/product.config
 	
 }
 
@@ -92,7 +103,7 @@ variantType() {
 		echo "invalid option ${answer}"
 		exit
 	fi
-	echo -e ${variant} > $temp_path/variant.config
+	echo -e ${variant} > $ag_temp_path/variant.config
 	
 	
 }
@@ -118,7 +129,7 @@ appsType() {
 			git clone https://github.com/BlissRoms-x86/vendor_foss vendor/foss
 		else
 			apps="&& export USE_FOSS_APPS=true "
-			echo -e ${apps} > $temp_path/apps.config
+			echo -e ${apps} > $ag_temp_path/apps.config
 			if [ -d $rompath/vendor/foss/bin ]; then
 				echo -e "Foss vendor apps already pulled"
 				echo ${purple}"Default Answer = N, Timeout in $TMOUT sec."${CL_RST}
@@ -174,7 +185,7 @@ appsType() {
 			echo -e "You will need to clone the gms into $rompath/vendor/gms first"
 		else
 			apps="&& export USE_GMS=true "
-			echo -e ${apps} > $temp_path/apps.config
+			echo -e ${apps} > $ag_temp_path/apps.config
 		fi
 	elif [ "${answer}" = "EMU-Gapps" ]; then
 		echo "you chose ${answer}"
@@ -191,7 +202,7 @@ appsType() {
 				rm -rf $rompath/vendor/foss/apps.mk
 			fi
 			apps="&& export USE_EMU_GAPPS=true"
-			echo -e ${apps} > $temp_path/apps.config
+			echo -e ${apps} > $ag_temp_path/apps.config
 		else
 			if [ -d $rompath/vendor/foss/bin ]; then
 				echo -e "Removing foss apps so gapps will work properly"
@@ -200,7 +211,7 @@ appsType() {
 				rm -rf $rompath/vendor/foss/apps.mk
 			fi
 			apps="&& export USE_EMU_GAPPS=true"
-			echo -e ${apps} > $temp_path/apps.config
+			echo -e ${apps} > $ag_temp_path/apps.config
 		fi
 	elif [ "${answer}" = "OpenGapps" ]; then
 		echo "you chose ${answer}"
@@ -208,7 +219,7 @@ appsType() {
 			echo -e "You will need to clone the gms into $rompath/vendor/opengapps first"
 		else
 			apps="&& export USE_OPENGAPPS=true "
-			echo -e ${apps} > $temp_path/apps.config
+			echo -e ${apps} > $ag_temp_path/apps.config
 		fi
 	elif [ "${answer}" = "Vanilla" ]; then
 		echo "you chose ${answer}"
@@ -246,10 +257,10 @@ nbType() {
 			bash $rompath/vendor/google/chromeos-x86/extract-files.sh
 			cd $rompath
 			nb_type="&& export USE_CROS_HOUDINI_NB=true "
-			echo -e ${nb_type} > $temp_path/nb_type.config
+			echo -e ${nb_type} > $ag_temp_path/nb_type.config
 		else
 			nb_type="&& export USE_CROS_HOUDINI_NB=true "
-			echo -e ${nb_type} > $temp_path/nb_type.config
+			echo -e ${nb_type} > $ag_temp_path/nb_type.config
 			if [ -d $rompath/vendor/google/chromeos-x86/proprietary ]; then 
 				echo "files already downloaded"
 			else
@@ -261,7 +272,7 @@ nbType() {
 	elif [ "${answer}" = "Google's libndk-translation" ]; then
 		echo "you chose ${answer}"
 		nb_type="&& export USE_LIBNDK_TRANSLATION_NB=true "
-		echo -e ${nb_type} > $temp_path/nb_type.config
+		echo -e ${nb_type} > $ag_temp_path/nb_type.config
 	else
 		echo "invalid option ${answer}"
 		exit
@@ -286,15 +297,15 @@ makeType() {
 	if [ "${answer}" = "Standard .iso Image" ]; then
 		echo "you chose ${answer}"
 		make_type="iso_img"
-		echo -e ${make_type} > $temp_path/make_type.config
+		echo -e ${make_type} > $ag_temp_path/make_type.config
 	elif [ "${answer}" = "EFI .img file" ]; then
 		echo "you chose ${answer}"
 		make_type="efi_img"
-		echo -e ${make_type} > $temp_path/make_type.config
+		echo -e ${make_type} > $ag_temp_path/make_type.config
 	elif [ "${answer}" = "RPM Linux Installer" ]; then
 		echo "you chose ${answer}"
 		make_type="rpm"
-		echo -e ${make_type} > $temp_path/make_type.config
+		echo -e ${make_type} > $ag_temp_path/make_type.config
 	else
 		echo "invalid option ${answer}"
 		exit
@@ -309,19 +320,19 @@ extraOptions() {
 	for option in "$array"; do
 		if _contains "${option}" "Make Clean before build"; then
 		  clean="&& make clean "
-		  echo -e ${clean} > $temp_path/clean.config
+		  echo -e ${clean} > $ag_temp_path/clean.config
 		fi
 		if _contains "${option}" "No Kernel Cross-Compile"; then
 		  nkcc="&& export NO_KERNEL_CROSS_COMPILE=true "
-		  echo -e ${nkcc} > $temp_path/nkcc.config
+		  echo -e ${nkcc} > $ag_temp_path/nkcc.config
 		fi
 		if ! _contains "${option}" "Make Clean before build"; then
 		  clean=""
-		  echo -e ${clean} > $temp_path/clean.config
+		  echo -e ${clean} > $ag_temp_path/clean.config
 		fi
 		if ! _contains "${option}" "No Kernel Cross-Compile"; then
 		  nkcc=""
-		  echo -e ${nkcc} > $temp_path/nkcc.config
+		  echo -e ${nkcc} > $ag_temp_path/nkcc.config
 		fi
 	done
 }
@@ -340,15 +351,15 @@ desktopMode() {
 		if [ "${answer}" = "Taskbar" ]; then
 			echo "you chose ${answer}"
 			desktop_mode="&& export USE_TASKBAR_UI=true "
-			echo -e ${desktop_mode} > $temp_path/desktop_mode.config
+			echo -e ${desktop_mode} > $ag_temp_path/desktop_mode.config
 		elif [ "${answer}" = "Smart-Dock" ]; then
 			echo "you chose ${answer}"
 			desktop_mode="&& export USE_SMARTDOCK=true "
-			echo -e ${desktop_mode} > $temp_path/desktop_mode.config
+			echo -e ${desktop_mode} > $ag_temp_path/desktop_mode.config
 		elif [ "${answer}" = "None" ]; then
 			echo "you chose ${answer}"
 			desktop_mode=""
-			echo -e ${desktop_mode} > $temp_path/desktop_mode.config
+			echo -e ${desktop_mode} > $ag_temp_path/desktop_mode.config
 		else
 			echo "invalid option ${answer}"
 			exit
@@ -377,15 +388,15 @@ runMakeClean() {
 	answer=$(0< "${dir_tmp}/${file_tmp}" )
 	if [ "${answer}" = "Make Clean just once on it's own" ]; then
 		run_clean_command="$env && make clean"
-		echo -e ${run_clean_command} > $temp_path/run_clean_command.sh 
-		chmod -x $temp_path/run_clean_command.sh
+		echo -e ${run_clean_command} > $ag_temp_path/run_clean_command.sh 
+		chmod -x $ag_temp_path/run_clean_command.sh
 		echo -e "Clean Command saved"
 		echo -e "$run_clean_command"
 		echo ""
 		echo "Project Working Path: $rompath"
 		echo ""
 		cd $rompath
-		bash $temp_path/run_clean_command.sh
+		bash $ag_temp_path/run_clean_command.sh
 	else
 		echo "invalid option ${answer}"
 		exit
@@ -405,12 +416,12 @@ enableRustik() {
 			cd $rompath/rusgik
 			rcmd1="rustup target add x86_64-unknown-linux-musl"
 			rcmd2="RUSTFLAGS='-C link-arg=-s' cargo build --release --target x86_64-unknown-linux-musl"
-			echo -e ${rcmd1} > $temp_path/rcmd1.sh
-			chmod -x $temp_path/rcmd1.sh
-			cp $temp_path/rcmd1.sh $rompath/rusgik
-			echo -e ${rcmd2} > $temp_path/rcmd2.sh
-			chmod -x $temp_path/rcmd2.sh
-			cp $temp_path/rcmd2.sh $rompath/rusgik
+			echo -e ${rcmd1} > $ag_temp_path/rcmd1.sh
+			chmod -x $ag_temp_path/rcmd1.sh
+			cp $ag_temp_path/rcmd1.sh $rompath/rusgik
+			echo -e ${rcmd2} > $ag_temp_path/rcmd2.sh
+			chmod -x $ag_temp_path/rcmd2.sh
+			cp $ag_temp_path/rcmd2.sh $rompath/rusgik
 			cat rcmd1.sh
 			bash rcmd1.sh
 			cat rcmd2.sh
@@ -423,12 +434,12 @@ enableRustik() {
 			cd $rompath/rusgik
 			rcmd1="rustup target add i686-unknown-linux-musl"
 			rcmd2="RUSTFLAGS='-C link-arg=-s' cargo build --release --target i686-unknown-linux-musl"
-			echo -e ${rcmd1} > $temp_path/rcmd1.sh
-			chmod -x $temp_path/rcmd1.sh
-			cp $temp_path/rcmd1.sh $rompath/rusgik
-			echo -e ${rcmd2} > $temp_path/rcmd2.sh
-			chmod -x $temp_path/rcmd2.sh
-			cp $temp_path/rcmd2.sh $rompath/rusgik
+			echo -e ${rcmd1} > $ag_temp_path/rcmd1.sh
+			chmod -x $ag_temp_path/rcmd1.sh
+			cp $ag_temp_path/rcmd1.sh $rompath/rusgik
+			echo -e ${rcmd2} > $ag_temp_path/rcmd2.sh
+			chmod -x $ag_temp_path/rcmd2.sh
+			cp $ag_temp_path/rcmd2.sh $rompath/rusgik
 			cat rcmd1.sh
 			bash rcmd1.sh
 			cat rcmd2.sh
@@ -467,17 +478,17 @@ runBuild() {
 		fi
 		
 		lunchtype="$product-$variant"
-		echo -e ${lunchtype} > $temp_path/lunch.config
+		echo -e ${lunchtype} > $ag_temp_path/lunch.config
 		full_command="$env && lunch $lunchtype $clean $apps $nb_type $desktop_mode $nkcc && make -j$(nproc --all) $make_type"
-		echo -e ${full_command} > $temp_path/command.sh 
-		chmod -x $temp_path/command.sh
+		echo -e ${full_command} > $ag_temp_path/command.sh 
+		chmod -x $ag_temp_path/command.sh
 		echo -e "Full Command saved"
 		echo -e "$full_command"
 		echo ""
 		echo "Project Working Path: $rompath"
 		echo ""
 		cd $rompath
-		bash $temp_path/command.sh
+		bash $ag_temp_path/command.sh
 	fi
 }
 
@@ -491,50 +502,52 @@ runBuild() {
 #~ runMakeClean
 #~ runBuild
 
-if [ -f $temp_path/command.sh ]; then
-	full_command=$(cat $temp_path/command.sh)
+if [ -f $ag_temp_path/command.sh ]; then
+	full_command=$(cat $ag_temp_path/command.sh)
 	echo "Full command loaded: ${full_command}"
 fi
-if [ -f $temp_path/apps.config ]; then
-	apps=$(cat $temp_path/apps.config)
+if [ -f $ag_temp_path/apps.config ]; then
+	apps=$(cat $ag_temp_path/apps.config)
 	echo "apps command loaded: ${apps}"
 fi
-if [ -f $temp_path/nb_type.config ]; then
-	nb_type=$(cat $temp_path/nb_type.config)
+if [ -f $ag_temp_path/nb_type.config ]; then
+	nb_type=$(cat $ag_temp_path/nb_type.config)
 	echo "nb_type command loaded: ${nb_type}"
 fi
-if [ -f $temp_path/lunch.config ]; then
-	lunch=$(cat $temp_path/lunch.config)
+if [ -f $ag_temp_path/lunch.config ]; then
+	lunch=$(cat $ag_temp_path/lunch.config)
 	echo "lunch command loaded: ${lunch}"
 fi
-if [ -f $temp_path/product.config ]; then
-	product=$(cat $temp_path/product.config)
+if [ -f $ag_temp_path/product.config ]; then
+	product=$(cat $ag_temp_path/product.config)
 	echo "product command loaded: ${product}"
 fi
-if [ -f $temp_path/variant.config ]; then
-	variant=$(cat $temp_path/variant.config)
+if [ -f $ag_temp_path/variant.config ]; then
+	variant=$(cat $ag_temp_path/variant.config)
 	echo "variant command loaded: ${variant}"
 fi
-if [ -f $temp_path/clean.config ]; then
-	clean=$(cat $temp_path/clean.config)
+if [ -f $ag_temp_path/clean.config ]; then
+	clean=$(cat $ag_temp_path/clean.config)
 	echo "clean command loaded: ${clean}"
 fi
-if [ -f $temp_path/desktop_mode.config ]; then
-	desktop_mode=$(cat $temp_path/desktop_mode.config)
+if [ -f $ag_temp_path/desktop_mode.config ]; then
+	desktop_mode=$(cat $ag_temp_path/desktop_mode.config)
 	echo "desktop_mode command loaded: ${desktop_mode}"
 fi
-if [ -f $temp_path/make_type.config ]; then
-	make_type=$(cat $temp_path/make_type.config)
+if [ -f $ag_temp_path/make_type.config ]; then
+	make_type=$(cat $ag_temp_path/make_type.config)
 	echo "make_type command loaded: ${make_type}"
 fi
-if [ -f $temp_path/nkcc.config ]; then
-	nkcc=$(cat $temp_path/nkcc.config)
+if [ -f $ag_temp_path/nkcc.config ]; then
+	nkcc=$(cat $ag_temp_path/nkcc.config)
 	echo "nkcc command loaded: ${nkcc}"
 fi
 
 while :
 	do
-	menu "Select Product Type" "Select Variant Type" "Select Apps Type" "Select Native-Bridge Type" "Select make type" "Select Desktop Mode integration" "Select Extra Options" "Run Make Clean" "Enable Rusty-Magisk" "Start the Build" 
+	# menu "Select Product Type" "Select Variant Type" "Select Apps Type" "Select Native-Bridge Type" "Select make type" "Select Desktop Mode integration" "Select Extra Options" "Run Make Clean" "Enable Rusty-Magisk" "Start the Build" 
+
+	menu "Select Product Type" "Select Variant Type" "Select Apps Type" "Select Native-Bridge Type" "Select make type" "Select Desktop Mode integration" "Select Extra Options" "Run Make Clean" "Start the Build" 
 	answer=$(0< "${dir_tmp}/${file_tmp}" )
 	if [ "${answer}" = "" ]; then
 		exit
@@ -575,10 +588,10 @@ while :
 		echo "Selected ${answer}"
 		runMakeClean
 	fi
-	if [ "${answer}" = "Enable Rusty-Magisk" ]; then
-		echo "Selected ${answer}"
-		enableRustik
-	fi
+	# if [ "${answer}" = "Enable Rusty-Magisk" ]; then
+	# 	echo "Selected ${answer}"
+	# 	enableRustik
+	# fi
 	
 done
 

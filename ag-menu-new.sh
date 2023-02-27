@@ -1,15 +1,18 @@
 #!/bin/bash
 
 SCRIPT_PATH=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-rompath="$(dirname "$SCRIPT_PATH")"
+# rompath="$(dirname "$SCRIPT_PATH")"
+# rompath=$(pwd)
+rompath="$PWD"
+export rompath="$PWD"
+
 echo -e "SCRIPT_PATH: $SCRIPT_PATH"
 echo -e "rompath: $rompath"
-# rompath="$PWD"
 ag_vendor_path="$SCRIPT_PATH"
 export ag_vendor_path="$ag_vendor_path"
-temp_path="$ag_vendor_path/tmp"
-export temp_path="$ag_vendor_path/tmp"
-mkdir -p $temp_path
+ag_temp_path="$ag_vendor_path/tmp"
+export ag_temp_path="$ag_vendor_path/tmp"
+mkdir -p $ag_temp_path
 
 targetspath="$ag_vendor_path/targets"
 export targetspath="$ag_vendor_path/targets"
@@ -64,8 +67,8 @@ elif [ -d "$rompath/vendor/lineage" ]; then
   CURRENT_BSP_TYPE="lineage"
 elif [ -d "$rompath/vendor/bliss" ]; then
   CURRENT_BSP_TYPE="bliss"
-fi 
-echo -e "CURRENT_BSP_TYPE: $CURRENT_BSP_TYPE"
+fi
+
 
 # Figure out targets or ask if not found
 CURRENT_TARGET_TYPE=""
@@ -77,69 +80,6 @@ CURRENT_TARGET_TYPE=""
 # elif [[ -d "$rompath/device/waydroid" ]]; then
 #   CURRENT_TARGET_TYPE="waydroid"
 # fi
-if [ "$CURRENT_TARGET_TYPE" == "" ]; then
-  preTargetsString=()
-  # We will only want to present targets that are available for the current API
-  # preTargetsString="generic emulator pc waydroid"
-  # preTargetsString="$(cd $targetspath && ls -d */ && cd $rompath)"
-  preTargetsString="$(cd $targetspath && dirs=(*/); echo "${dirs[@]%/}" && cd $rompath)"
-  # preTargetsString="$(for i in $(ls -d $targetspath/*/); do echo ${i%%/}; done)"
-  # preTargetsString="$(find $targetspath -maxdepth 1 -mindepth 1 -type d )"
-  echo -e "preTargetsString: $preTargetsString"
-  targetsStringArray=($preTargetsString)
-  for t in $preTargetsString; do
-    export CURRENT_TARGET_PATH="$targetspath/$t"
-
-    tstring_ok="false"
-    if [ -d "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
-      tstring_ok="true"
-      echo "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION" > $temp_path/$t-manifest.cfg
-      export CURRENT_${t}_MANIFEST_PATH="$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION"
-    fi
-    if [ -d "$targetspath/$t/scripts/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
-      tstring_ok="true"
-      export CURRENT_${t}_SCRIPTS_PATH="$targetspath/$t/scripts/api-$CURRENT_PLATFORM_SDK_VERSION"
-    fi
-    if [ -d "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
-      tstring_ok="true"
-      echo "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" > $temp_path/$t-patches.cfg
-      export CURRENT_${t}_PATCHES_PATH="$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION"
-    fi
-    
-    if [ "$tstring_ok" == "true" ]; then
-      targetsString="$targetsString $t"
-    else
-      echo "No compatible components found in $targetspath/$t/ for api-$CURRENT_PLATFORM_SDK_VERSION"
-    fi
-  done
-  echo -e "targetsString: $targetsString"
-
-  while :
-    do
-    menu $targetsString
-    answer=$(0< "${dir_tmp}/${file_tmp}" )
-    #
-    for i in $targetsString ; do
-      if [ "${answer}" = "${i}" ]; then
-        notify_message "Selected \"${i}\" ..."
-        notify_change "${i}"			
-        CURRENT_TARGET_TYPE="${i}"
-        bash $SCRIPT_PATH/core-menu/core-menu.sh -c $targetspath/$CURRENT_TARGET_TYPE/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json -d
-      fi
-    done
-    if [ "${answer}" = "" ]; then
-      exit
-    fi
-  done
-fi
-
-echo -e "CURRENT_TARGET_TYPE: $CURRENT_TARGET_TYPE"
-# Functions Start
-
-# Use CURRENT_PLATFORM_SDK_VERSION to see what generic addons and targets are available
-# find_modules() {}
-
-# Functions End
 
 # CLI Menu Start
 
@@ -152,55 +92,13 @@ do
     -h | --help)
       echo "Usage: $0 options"
       echo "options: -h | --help: Shows this dialog"
-      echo "	-c | --clean: cleans up downloaded apps"
-      echo "	-v | --version: Shows version info"
-      echo "	-s | --search | search: Searches all repos for a package"
-      echo "	-l | --listrepos | listrepos: Lists all added fdroid repos"
-      echo "	-a | --addrepo | addrepo (repo repo_url): Adds a new fdroid repo"
-      echo "	-r | --removerepo | removerepo (repo): Removes a repo"
-      echo "	-u | --updaterepo | updaterepo (repo repo_url): Updates a new fdroid repo"
-      echo "	-i | --install | install (app_name): Searches for & installs an app"
-      echo "	-n | --remove | remove (app_name): uninstalls an app"
-      echo "	-m | --listapps | listapps: Lists all installed apps"
-      echo "	-p | --apkinstall | apkinstall (apk_location): installs an apk"
+      echo "	-d | --debug: Displays debugging info"
 	  exit 0
       ;;
-    -c | --clean)
-      clean="y";
-      echo "Cleaning..."
-	  cleanUp
-      ;;
-    -v | --version)
-      echo "Version: Waydroid Package Manager 0.01"
-      echo "Updated: 03/31/2022"
-	  exit 0
-      ;;
-    -s | --search | search)
-      SEARCH="true";
-	  ;;
-    -a | --addrepo | addrepo)
-	  ADD_REPO="true";
-      ;;
-    -r | --removerepo | removerepo)
-	  REMOVE_REPO="true";
-      ;;
-    -u | --updaterepo | updaterepo)
-	  UPDATE_REPO="true";
-      ;;
-    -l | --listrepos | listrepos)
-	  LIST_REPOS="true";
-      ;;
-    -i | --install | install)
-	  INSTALL="true";
-      ;;
-    -n | --remove | remove)
-	  REMOVE="true";
-      ;;
-    -m | --listapps | listapps)
-	  LIST_APPS="true";
-      ;;
-    -p | --apkinstall | apkinstall)
-	  APKINSTALL="true";
+    -d | --debug)
+      ag_debug="true";
+      export ag_debug="true";
+      echo "Using debugging mode..."
       ;;
   # ...
 
@@ -233,3 +131,74 @@ do
   # for testing purposes:
   shift
 done
+
+if [[ "$ag_debug" == "true" ]]; then
+  echo -e "CURRENT_BSP_TYPE: $CURRENT_BSP_TYPE"
+fi
+
+if [ "$CURRENT_TARGET_TYPE" == "" ]; then
+  preTargetsString=()
+  # We will only want to present targets that are available for the current API
+  # preTargetsString="generic emulator pc waydroid"
+  # preTargetsString="$(cd $targetspath && ls -d */ && cd $rompath)"
+  preTargetsString="$(cd $targetspath && dirs=(*/); echo "${dirs[@]%/}" && cd $rompath)"
+  # preTargetsString="$(for i in $(ls -d $targetspath/*/); do echo ${i%%/}; done)"
+  # preTargetsString="$(find $targetspath -maxdepth 1 -mindepth 1 -type d )"
+  if [[ "$ag_debug" == "true" ]]; then
+  echo -e "preTargetsString: $preTargetsString"
+  fi
+  targetsStringArray=($preTargetsString)
+  for t in $preTargetsString; do
+    export CURRENT_TARGET_PATH="$targetspath/$t"
+
+    tstring_ok="false"
+    if [ -d "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
+      tstring_ok="true"
+      echo "$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION" > $ag_temp_path/$t-manifest.cfg
+      export CURRENT_${t}_MANIFEST_PATH="$targetspath/$t/manifests/api-$CURRENT_PLATFORM_SDK_VERSION"
+    fi
+    if [ -d "$targetspath/$t/scripts/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
+      tstring_ok="true"
+      export CURRENT_${t}_SCRIPTS_PATH="$targetspath/$t/scripts/api-$CURRENT_PLATFORM_SDK_VERSION"
+    fi
+    if [ -d "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" ]; then
+      tstring_ok="true"
+      echo "$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION" > $ag_temp_path/$t-patches.cfg
+      export CURRENT_${t}_PATCHES_PATH="$targetspath/$t/patches/api-$CURRENT_PLATFORM_SDK_VERSION"
+    fi
+    
+    if [ "$tstring_ok" == "true" ]; then
+      targetsString="$targetsString $t"
+    else
+      echo "No compatible components found in $targetspath/$t/ for api-$CURRENT_PLATFORM_SDK_VERSION"
+    fi
+  done
+  if [[ "$ag_debug" == "true" ]]; then
+  echo -e "targetsString: $targetsString"
+  fi
+
+  while :
+    do
+    menu $targetsString
+    answer=$(0< "${dir_tmp}/${file_tmp}" )
+    #
+    for i in $targetsString ; do
+      if [ "${answer}" = "${i}" ]; then
+        notify_message "Selected \"${i}\" ..."
+        notify_change "${i}"			
+        CURRENT_TARGET_TYPE="${i}"
+        if [[ "$ag_debug" == "true" ]]; then
+        bash $SCRIPT_PATH/core-menu/core-menu.sh -c $targetspath/$CURRENT_TARGET_TYPE/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json -d
+        else
+        bash $SCRIPT_PATH/core-menu/core-menu.sh -c $targetspath/$CURRENT_TARGET_TYPE/menus/api-$CURRENT_PLATFORM_SDK_VERSION/menu.json
+        fi
+      fi
+    done
+    if [ "${answer}" = "" ]; then
+      exit
+    fi
+  done
+fi
+if [[ "$ag_debug" == "true" ]]; then
+echo -e "CURRENT_TARGET_TYPE: $CURRENT_TARGET_TYPE"
+fi

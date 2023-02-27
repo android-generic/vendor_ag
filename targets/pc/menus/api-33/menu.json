@@ -26,54 +26,40 @@
         ]
       },
       {
-        "name": "Start-Waydroid__Weston",
+        "name": "Apply Base Patches",
         "descr": "",
-        "command": "bash /usr/bin/waydroid-session.sh",
+        "command": "bash vendor/ag/targets/pc/scripts/api-33/apply-base-patchsets/apply-base-patchsets.sh",
         "dependencies": [
           {
-              "dep": "ls /usr/bin/waydroid-session.sh"
+              "dep": "ls -d vendor/google/chromeos-x86"
           }
         ]
       },
       {
-        "name": "Tools",
+        "name": "Apply Kernel Patches",
+        "descr": "",
+        "command": "bash vendor/ag/targets/pc/scripts/api-33/apply-kernel-patches/apply-kernel-patches.sh",
+        "dependencies": [
+          {
+              "dep": "ls -d vendor/google/chromeos-x86"
+          }
+        ]
+      },
+      {
+        "name": "Build Options",
         "descr": "",
         "command": "",
+        "dependencies": [
+          {
+              "dep": "ls vendor/ag/tmp/base_patches_applied",
+              "dep": "ls vendor/ag/tmp/kernel_patches_applied"
+          }
+        ],
         "menuEntry": [
           {
-            "name": "Setup Network",
+            "name": "Configure and Compile your PC build",
             "descr": "",
-            "command": "bash ~/.local/bin/easy-net-connect.sh",
-            "dependencies": [
-              {
-                  "dep": "ls ~/.local/bin/easy-net-connect.sh"
-              }
-            ]
-          },
-          {
-            "name": "Configure Waydroid Options",
-            "descr": "",
-            "command": "bash /usr/bin/configure_launch_type.sh",
-            "dependencies": [
-              {
-                  "dep": "ls /usr/bin/configure_launch_type.sh"
-              }
-            ]
-          },
-          {
-            "name": "Sleep",
-            "descr": "",
-            "command": "systemctl suspend"
-          },
-          {
-            "name": "reboot",
-            "descr": "",
-            "command": "reboot"
-          },
-          {
-            "name": "Shutdown",
-            "descr": "",
-            "command": "shutdown"
+            "command": "bash vendor/ag/targets/pc/scripts/api-33/build-options/build-options.sh"
           }
         ]
       }

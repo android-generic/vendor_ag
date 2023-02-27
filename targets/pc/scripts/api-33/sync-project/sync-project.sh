@@ -16,29 +16,21 @@
 #
 
 top_dir=`pwd`
-LOCALDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-loc_man="${top_dir}/.repo/local_manifests"
-rompath="$PWD"
-vendor_path="ag"
-temp_path="$rompath/vendor/$vendor_path/tmp/"
-config_type="$1"
 popt=0
 # source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
 source $ag_vendor_path/core-menu/includes/easybashgui
 # include $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
 
-SCRIPT_PATH=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-rompath="$(dirname "$SCRIPT_PATH")"
+if [[ "$ag_debug" == "true" ]]; then
 echo -e "SCRIPT_PATH: $SCRIPT_PATH"
 echo -e "rompath: $rompath"
-
 echo -e "ag_vendor_path: $ag_vendor_path"
-echo -e "temp_path: $temp_path"
+echo -e "ag_temp_path: $ag_temp_path"
 echo -e "targetspath: $targetspath"
 echo -e "CURRENT_pc_MANIFEST_PATH: $CURRENT_pc_MANIFEST_PATH"
 echo -e "CURRENT_pc_PATCHES_PATH: $CURRENT_pc_PATCHES_PATH"
 echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
-
+fi
 echo -e "variables set"
 
 repo sync -c --force-sync --no-tags --no-clone-bundle -j$(nproc --all) --optimized-fetch --prune

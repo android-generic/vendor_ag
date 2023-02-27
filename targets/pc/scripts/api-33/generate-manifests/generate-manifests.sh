@@ -16,46 +16,41 @@
 #
 
 top_dir=`pwd`
-LOCALDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-loc_man="${top_dir}/.repo/local_manifests"
-rompath="$PWD"
-vendor_path="ag"
-temp_path="$rompath/vendor/$vendor_path/tmp/"
-config_type="$1"
 popt=0
 # source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
 source $ag_vendor_path/core-menu/includes/easybashgui
 # include $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
 
-SCRIPT_PATH=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-rompath="$(dirname "$SCRIPT_PATH")"
+if [[ "$ag_debug" == "true" ]]; then
 echo -e "SCRIPT_PATH: $SCRIPT_PATH"
 echo -e "rompath: $rompath"
-
 echo -e "ag_vendor_path: $ag_vendor_path"
-echo -e "temp_path: $temp_path"
+echo -e "ag_temp_path: $ag_temp_path"
 echo -e "targetspath: $targetspath"
 echo -e "CURRENT_pc_MANIFEST_PATH: $CURRENT_pc_MANIFEST_PATH"
-# manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
-base_manifests_path="$CURRENT_pc_MANIFEST_PATH"
 echo -e "CURRENT_pc_PATCHES_PATH: $CURRENT_pc_PATCHES_PATH"
 echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
-
 echo -e "variables set"
-
+fi
 echo -e "Setting up local_manifests"
+# manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
+base_manifests_path="$CURRENT_pc_MANIFEST_PATH"
 mkdir -p ${loc_man}
 
 # Parse available manifest options
 preManifestsString=()
 preManifestsString="$(cd $base_manifests_path && dirs=(*/); echo "${dirs[@]%/}" && cd $rompath)"
 
+if [[ "$ag_debug" == "true" ]]; then
 echo -e "preManifestsString: $preManifestsString"
+fi
 manifestsStringArray=($preManifestsString)
 for m in $preManifestsString; do
     manifestsString="$manifestsString $m"
 done
+if [[ "$ag_debug" == "true" ]]; then
 echo -e "manifestsString: $manifestsString"
+fi
 
 ok_message "Please choose from available base types on the next screen."
 while :
@@ -63,15 +58,20 @@ do
     menu $manifestsString
     answer=$(0< "${dir_tmp}/${file_tmp}" )
     #
+    if [[ "$ag_debug" == "true" ]]; then
     echo -e "answer: ${answer}"
+    fi
     for ms in $manifestsString ; do
+        if [[ "$ag_debug" == "true" ]]; then
         echo -e "ms: $ms"
+        fi
         if [ "*${answer}*" = "*${ms}*" ]; then
         notify_message "Selected \"${ms}\" ..."
         # notify_change "${i}"
         manifests_path="$base_manifests_path/${ms}"
+        if [[ "$ag_debug" == "true" ]]; then
         echo -e "manifests_path: $manifests_path"
-        
+        fi
         echo -e ${reset}""${reset}
         echo -e ${green}"Placing manifest fragments..."${reset}
         echo -e ${reset}""${reset}
