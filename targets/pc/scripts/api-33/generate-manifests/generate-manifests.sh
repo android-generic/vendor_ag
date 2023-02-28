@@ -33,6 +33,7 @@ echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
 echo -e "variables set"
 fi
 echo -e "Setting up local_manifests"
+loc_man="$rompath/.repo/local_manifests"
 # manifests_url="https://raw.githubusercontent.com/android-generic/vendor_ag/unified/configs/pc"
 base_manifests_path="$CURRENT_pc_MANIFEST_PATH"
 mkdir -p ${loc_man}
