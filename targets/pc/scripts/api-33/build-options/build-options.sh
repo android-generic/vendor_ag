@@ -127,6 +127,7 @@ appsType() {
 		if [ ! -d $rompath/vendor/foss ]; then
 			echo -e "Cloning vendor/foss now. You will need to re-run this command"
 			git clone https://github.com/BlissRoms-x86/vendor_foss vendor/foss
+			alert_message "FOSS repo cloned. You will have to re-run the FOSS apps option again to download the apps. "
 		else
 			apps="&& export USE_FOSS_APPS=true "
 			echo -e ${apps} > $ag_temp_path/apps.config
