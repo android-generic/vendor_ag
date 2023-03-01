@@ -46,6 +46,16 @@
         ]
       },
       {
+        "name": "Apply Addon Patchsets",
+        "descr": "",
+        "command": "bash vendor/ag/targets/pc/scripts/api-33/apply-addon-patchsets/apply-addon-patchsets.sh",
+        "dependencies": [
+          {
+              "dep": "ls -d vendor/google/chromeos-x86"
+          }
+        ]
+      },
+      {
         "name": "Build Options",
         "descr": "",
         "command": "",

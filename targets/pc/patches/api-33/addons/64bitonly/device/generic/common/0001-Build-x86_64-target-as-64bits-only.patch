@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 15 Sep 2022 14:02:51 +0200
+Subject: [PATCH] Build x86_64 target as 64bits only
+
+A dual ABI build makes the soong step the use a huge amount of memory. A
+single ABI build is still manageable on 16GB RAM system.
+---
+ manifest.xml | 13 -------------
+ 1 file changed, 13 deletions(-)
+
+diff --git a/manifest.xml b/manifest.xml
+index ea2b8f6..6dea2b8 100644
+--- a/manifest.xml
++++ b/manifest.xml
+@@ -89,19 +89,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.omx</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IOmx</name>
+-            <instance>default</instance>
+-        </interface>
+-        <interface>
+-            <name>IOmxStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.power</name>
+         <transport>hwbinder</transport>

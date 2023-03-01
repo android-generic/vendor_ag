@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 15 Sep 2022 14:04:23 +0200
+Subject: [PATCH] Build x86_64 target as 64bits only
+
+A dual ABI build makes the soong step the use a huge amount of memory. A
+single ABI build is still manageable on 16GB RAM system.
+---
+ BoardConfig.mk | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/BoardConfig.mk b/BoardConfig.mk
+index 07bb4c3..23043a9 100644
+--- a/BoardConfig.mk
++++ b/BoardConfig.mk
+@@ -8,13 +8,8 @@ TARGET_CPU_ABI := x86_64
+ TARGET_ARCH := x86_64
+ TARGET_ARCH_VARIANT := x86_64
+ 
+-TARGET_2ND_CPU_ABI := x86
+-TARGET_2ND_ARCH := x86
+-TARGET_2ND_ARCH_VARIANT := x86_64
+-
+ TARGET_CPU_ABI_LIST_64_BIT := $(TARGET_CPU_ABI) $(TARGET_CPU_ABI2) $(NATIVE_BRIDGE_ABI_LIST_64_BIT)
+-TARGET_CPU_ABI_LIST_32_BIT := $(TARGET_2ND_CPU_ABI) $(TARGET_2ND_CPU_ABI2) $(NATIVE_BRIDGE_ABI_LIST_32_BIT)
+-TARGET_CPU_ABI_LIST := $(TARGET_CPU_ABI) $(TARGET_CPU_ABI2) $(TARGET_2ND_CPU_ABI) $(TARGET_2ND_CPU_ABI2) $(NATIVE_BRIDGE_ABI_LIST_32_BIT) $(NATIVE_BRIDGE_ABI_LIST_64_BIT)
++TARGET_CPU_ABI_LIST := $(TARGET_CPU_ABI_LIST_64_BIT)
+ 
+ TARGET_USERIMAGES_USE_EXT4 := true
+ BOARD_USERDATAIMAGE_PARTITION_SIZE := 576716800
