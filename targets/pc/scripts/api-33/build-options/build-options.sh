@@ -127,41 +127,19 @@ appsType() {
 		if [ ! -d $rompath/vendor/foss ]; then
 			echo -e "Cloning vendor/foss now. You will need to re-run this command"
 			git clone https://github.com/BlissRoms-x86/vendor_foss vendor/foss
-			alert_message "FOSS repo cloned. You will have to re-run the FOSS apps option again to download the apps. "
-		else
-			apps="&& export USE_FOSS_APPS=true "
-			echo -e ${apps} > $ag_temp_path/apps.config
-			if [ -d $rompath/vendor/foss/bin ]; then
-				echo -e "Foss vendor apps already pulled"
-				echo ${purple}"Default Answer = N, Timeout in $TMOUT sec."${CL_RST}
-				menu "Update FOSS apps" "Do not update"
-				choice="$( 0< "${dir_tmp}/${file_tmp}" )"
-				if [ "${choice}" = "Do not update" ]
-					then
-					ok_message "doing nothing"
-				elif [ "${choice}" = "Update FOSS apps" ]; then
-					if [ "$product" == "android_x86_64" ]; then
-						ok_message "updating x86_64 foss apps now"
-						cd $rompath/vendor/foss/
-						bash $rompath/vendor/foss/update.sh 1
-						cd $rompath
-					elif [ "$product" == "android_x86" ]; then
-						ok_message "updating x86 foss apps now"
-						cd $rompath/vendor/foss/
-						bash $rompath/vendor/foss/update.sh 3
-						cd $rompath
-					else
-						ok_message "updating foss apps now"
-						cd $rompath/vendor/foss/
-						bash $rompath/vendor/foss/update.sh
-						cd $rompath
-					fi
-				else
-					
-					exit 0
-				fi
-
-			else
+			# alert_message "FOSS repo cloned. You will have to re-run the FOSS apps option again to download the apps. "
+		fi
+		apps="&& export USE_FOSS_APPS=true "
+		echo -e ${apps} > $ag_temp_path/apps.config
+		if [ -d $rompath/vendor/foss/bin ]; then
+			echo -e "Foss vendor apps already pulled"
+			echo ${purple}"Default Answer = N, Timeout in $TMOUT sec."${CL_RST}
+			menu "Update FOSS apps" "Do not update"
+			choice="$( 0< "${dir_tmp}/${file_tmp}" )"
+			if [ "${choice}" = "Do not update" ]
+				then
+				ok_message "doing nothing"
+			elif [ "${choice}" = "Update FOSS apps" ]; then
 				if [ "$product" == "android_x86_64" ]; then
 					ok_message "updating x86_64 foss apps now"
 					cd $rompath/vendor/foss/
@@ -178,8 +156,41 @@ appsType() {
 					bash $rompath/vendor/foss/update.sh
 					cd $rompath
 				fi
+			else
+				
+				exit 0
 			fi
-		fi		
+
+		else
+			if [ "$product" == "android_x86_64" ]; then
+				ok_message "updating x86_64 foss apps now"
+				cd $rompath/vendor/foss/
+				bash $rompath/vendor/foss/update.sh 1
+				cd $rompath
+			elif [ "$product" == "android_x86" ]; then
+				ok_message "updating x86 foss apps now"
+				cd $rompath/vendor/foss/
+				bash $rompath/vendor/foss/update.sh 3
+				cd $rompath
+			else
+				ok_message "updating foss apps now"
+				cd $rompath/vendor/foss/
+				bash $rompath/vendor/foss/update.sh
+				cd $rompath
+			fi
+		fi
+		if [ -d $rompath/vendor/foss/bin ]; then
+			cd $rompath/device/generic/common/
+			if [ ! $(grep "call inherit-product-if-exists, vendor/foss/foss.mk") ]; then
+				echo "$(call inherit-product-if-exists, vendor/foss/foss.mk)" >> device.mk
+				git add device.mk
+				git commit -m $'Inherit FOSS apps\nThis will call vendor/foss/foss.mk' --author="AG Commit-Bot <info@blissos.org>" --no-edit
+				alert_message "A change has been committed to $rompath/device/generic/common/device.mk."
+			fi
+			cd $rompath
+		else
+			alert_message "There was an issue somewhere... Please check console feedback to see what went wrong"
+		fi
 	elif [ "${answer}" = "GMS" ]; then
 		echo "you chose ${answer}"
 		if [ ! -d $rompath/vendor/gms ]; then
