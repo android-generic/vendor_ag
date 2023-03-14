@@ -8,7 +8,7 @@
       {
         "name": "Generate Manifest",
         "descr": "",
-        "command": "bash vendor/ag/targets/pc/scripts/api-33/generate-manifests/generate-manifests.sh pc", 
+        "command": "bash vendor/ag/targets/pc/scripts/api-32/generate-manifests/generate-manifests.sh pc", 
         "dependencies": [
           {
             "dep": "ls -d .repo"
@@ -18,7 +18,7 @@
       {
         "name": "Sync Generated Manifest",
         "descr": "",
-        "command": "bash vendor/ag/targets/pc/scripts/api-33/sync-project/sync-project.sh",
+        "command": "bash vendor/ag/targets/pc/scripts/api-32/sync-project/sync-project.sh",
         "dependencies": [
           {
               "dep": "ls .repo/local_manifests/02-android-x86.xml"
@@ -28,7 +28,7 @@
       {
         "name": "Apply Base Patches",
         "descr": "",
-        "command": "bash vendor/ag/targets/pc/scripts/api-33/apply-base-patchsets/apply-base-patchsets.sh",
+        "command": "bash vendor/ag/targets/pc/scripts/api-32/apply-base-patchsets/apply-base-patchsets.sh",
         "dependencies": [
           {
               "dep": "ls -d bootable/newinstaller"
@@ -38,7 +38,7 @@
       {
         "name": "Apply Kernel Patches",
         "descr": "",
-        "command": "bash vendor/ag/targets/pc/scripts/api-33/apply-kernel-patches/apply-kernel-patches.sh",
+        "command": "bash vendor/ag/targets/pc/scripts/api-32/apply-kernel-patches/apply-kernel-patches.sh",
         "dependencies": [
           {
               "dep": "ls -d bootable/newinstaller"
@@ -48,7 +48,7 @@
       {
         "name": "Apply Addon Patchsets",
         "descr": "",
-        "command": "bash vendor/ag/targets/pc/scripts/api-33/apply-addon-patchsets/apply-addon-patchsets.sh",
+        "command": "bash vendor/ag/targets/pc/scripts/api-32/apply-addon-patchsets/apply-addon-patchsets.sh",
         "dependencies": [
           {
               "dep": "ls -d bootable/newinstaller"
@@ -69,7 +69,7 @@
           {
             "name": "Configure and Compile your PC build",
             "descr": "",
-            "command": "bash vendor/ag/targets/pc/scripts/api-33/build-options/build-options.sh"
+            "command": "bash vendor/ag/targets/pc/scripts/api-32/build-options/build-options.sh"
           }
         ]
       }

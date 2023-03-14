@@ -1,0 +1,69 @@
+From ab3bdce45aec5ef6003a5fc639f710c4f31e4ac2 Mon Sep 17 00:00:00 2001
+From: "tenk.wang" <tenk.wang@wesion.com>
+Date: Mon, 24 Jan 2022 20:41:36 +0000
+Subject: [PATCH 3/9] modify about_settings string
+
+Signed-off-by: tenk.wang <tenk.wang@wesion.com>
+Change-Id: I57c67f0a1cdaa40cc28e57d4ef8ab025651124f1
+---
+ res/values-zh-rCN/strings.xml | 2 +-
+ res/values-zh-rHK/strings.xml | 2 +-
+ res/values-zh-rTW/strings.xml | 2 +-
+ res/values/strings.xml        | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/res/values-zh-rCN/strings.xml b/res/values-zh-rCN/strings.xml
+index 0c9990f926..2af0525ab0 100755
+--- a/res/values-zh-rCN/strings.xml
++++ b/res/values-zh-rCN/strings.xml
+@@ -1881,7 +1881,7 @@
+     <string name="location_access_summary" msgid="8634100005481578143">"允许得到您许可的应用使用您的位置信息"</string>
+     <string name="location_sources_heading" msgid="6126965815860570524">"位置信息来源"</string>
+     <string name="about_settings" product="tablet" msgid="2888705054709289693">"关于平板电脑"</string>
+-    <string name="about_settings" product="default" msgid="4038626127378127613">"关于手机"</string>
++    <string name="about_settings" product="default" msgid="4038626127378127613">"关于设备"</string>
+     <string name="about_settings" product="device" msgid="9012888717090302815">"关于设备"</string>
+     <string name="about_settings" product="emulator" msgid="2516560858771320366">"关于模拟设备"</string>
+     <string name="about_settings_summary" msgid="4831942939227432513">"查看法律信息、状态和软件版本"</string>
+diff --git a/res/values-zh-rHK/strings.xml b/res/values-zh-rHK/strings.xml
+index 4f5385d01a..7b38fd218a 100755
+--- a/res/values-zh-rHK/strings.xml
++++ b/res/values-zh-rHK/strings.xml
+@@ -1884,7 +1884,7 @@
+     <string name="location_access_summary" msgid="8634100005481578143">"允許提出權限要求的應用程式使用您的位置資訊"</string>
+     <string name="location_sources_heading" msgid="6126965815860570524">"位置資訊來源"</string>
+     <string name="about_settings" product="tablet" msgid="2888705054709289693">"關於平板電腦"</string>
+-    <string name="about_settings" product="default" msgid="4038626127378127613">"關於手機"</string>
++    <string name="about_settings" product="default" msgid="4038626127378127613">"關於裝置"</string>
+     <string name="about_settings" product="device" msgid="9012888717090302815">"關於裝置"</string>
+     <string name="about_settings" product="emulator" msgid="2516560858771320366">"關於模擬裝置"</string>
+     <string name="about_settings_summary" msgid="4831942939227432513">"查看法律資訊、狀態、軟件版本"</string>
+diff --git a/res/values-zh-rTW/strings.xml b/res/values-zh-rTW/strings.xml
+index a72d807baa..0664a2c3c8 100755
+--- a/res/values-zh-rTW/strings.xml
++++ b/res/values-zh-rTW/strings.xml
+@@ -1883,7 +1883,7 @@
+     <string name="location_access_summary" msgid="8634100005481578143">"允許獲得你許可的應用程式使用你的位置資訊"</string>
+     <string name="location_sources_heading" msgid="6126965815860570524">"位置資訊來源"</string>
+     <string name="about_settings" product="tablet" msgid="2888705054709289693">"關於平板電腦"</string>
+-    <string name="about_settings" product="default" msgid="4038626127378127613">"關於手機"</string>
++    <string name="about_settings" product="default" msgid="4038626127378127613">"關於裝置"</string>
+     <string name="about_settings" product="device" msgid="9012888717090302815">"關於裝置"</string>
+     <string name="about_settings" product="emulator" msgid="2516560858771320366">"關於模擬裝置"</string>
+     <string name="about_settings_summary" msgid="4831942939227432513">"查看法律資訊、狀態、軟體版本"</string>
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index c3082ecab8..c8b5c5334b 100755
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -4307,7 +4307,7 @@
+     <!-- Main settings screen, setting title for the user to go into the About phone screen -->
+     <string name="about_settings" product="tablet">About tablet</string>
+     <!-- Main settings screen, setting title for the user to go into the About phone screen -->
+-    <string name="about_settings" product="default">About phone</string>
++    <string name="about_settings" product="default">About device</string>
+     <!-- Main settings screen, setting title for the user to go into the About phone screen -->
+     <string name="about_settings" product="device">About device</string>
+     <!-- Main settings screen, setting title for the user to go into the About phone screen -->
+-- 
+2.34.1
+

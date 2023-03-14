@@ -1,0 +1,27 @@
+From 70b15f286c0ad7b80a6f3afe25cf4db925100347 Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Mon, 16 Jan 2023 16:45:40 -0500
+Subject: [PATCH] Update kernel config to include rmi_core
+
+Change-Id: I8ebc733d7921ee4b99ec4d71a0135602ef2887b5
+---
+ arch/x86/configs/android-x86_64_defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/configs/android-x86_64_defconfig b/arch/x86/configs/android-x86_64_defconfig
+index c79678ef6fca..ab966d95fd71 100644
+--- a/arch/x86/configs/android-x86_64_defconfig
++++ b/arch/x86/configs/android-x86_64_defconfig
+@@ -5924,7 +5924,8 @@ CONFIG_HID_SPEEDLINK=m
+ CONFIG_HID_STEAM=m
+ CONFIG_HID_STEELSERIES=m
+ CONFIG_HID_SUNPLUS=m
+-CONFIG_HID_RMI=m
++CONFIG_HID_RMI=y
++CONFIG_RMI_CORE=y
+ CONFIG_HID_GREENASIA=m
+ CONFIG_GREENASIA_FF=y
+ CONFIG_HID_HYPERV_MOUSE=m
+-- 
+2.34.1
+

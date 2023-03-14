@@ -1,0 +1,49 @@
+From 90ad2409bd0944c7e3d7eb1f2dd2d1dd8244a876 Mon Sep 17 00:00:00 2001
+From: "jinfeng.han" <jinfeng.han@rock-chips.com>
+Date: Wed, 7 Sep 2022 02:07:16 +0000
+Subject: [PATCH 5/9] hdmi_dialog_does_not_disappear
+
+Change-Id: Id401aa048a40758b425e760e528deda21ca39064
+---
+ AndroidManifest.xml                                | 4 +++-
+ src/com/android/settings/display/HdmiSettings.java | 2 +-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/AndroidManifest.xml b/AndroidManifest.xml
+index a6bac81fcd..442cc07030 100644
+--- a/AndroidManifest.xml
++++ b/AndroidManifest.xml
+@@ -109,6 +109,7 @@
+     <uses-permission android:name="android.permission.MANAGE_APP_HIBERNATION" />
+     <uses-permission android:name="android.permission.LAUNCH_MULTI_PANE_SETTINGS_DEEP_LINK" />
+     <uses-permission android:name="android.permission.ALLOW_PLACE_IN_MULTI_PANE_SETTINGS" />
++    <uses-permission android:name="android.permission.CHANGE_CONFIGURATION"></uses-permission>
+ 
+     <application
+             android:name=".SettingsApplication"
+@@ -197,7 +198,8 @@
+             </intent-filter>
+         </receiver>
+ 
+-        <activity android:name=".SubSettings"
++	<activity android:name=".SubSettings"
++                  android:configChanges="orientation|locale|density|screenSize|screenLayout|smallestScreenSize"
+                   android:theme="@style/Theme.SubSettings" />
+ 
+         <activity android:name=".Settings$CreateShortcutActivity"
+diff --git a/src/com/android/settings/display/HdmiSettings.java b/src/com/android/settings/display/HdmiSettings.java
+index 479dba1f09..e37946eeea 100755
+--- a/src/com/android/settings/display/HdmiSettings.java
++++ b/src/com/android/settings/display/HdmiSettings.java
+@@ -449,7 +449,7 @@ public class HdmiSettings extends SettingsPreferenceFragment
+                                 Message message = new Message();
+                                 message.what = MSG_SHOW_CONFIRM_DIALOG;
+                                 message.obj = control;
+-                                mHandler.sendMessageDelayed(message, 300);
++                                mHandler.sendMessageDelayed(message, 2000);
+                             }
+                         } else {
+                             Message message = new Message();
+-- 
+2.34.1
+

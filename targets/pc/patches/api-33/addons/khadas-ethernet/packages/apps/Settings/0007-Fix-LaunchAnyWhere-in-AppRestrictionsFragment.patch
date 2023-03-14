@@ -1,0 +1,42 @@
+From 62ef118c904891a85f928fac477a4901a341541f Mon Sep 17 00:00:00 2001
+From: Edgar Wang <edgarwang@google.com>
+Date: Wed, 6 Apr 2022 17:30:27 +0800
+Subject: [PATCH 7/9] Fix LaunchAnyWhere in AppRestrictionsFragment
+
+If the intent's package equals to the app's package, this intent
+will be allowed to startActivityForResult.
+But this check is unsafe, because if the component of this intent
+is set, the package field will just be ignored. So if we set the
+component to any activity we like and set package to the app's
+package, it will pass the assertSafeToStartCustomActivity check
+and now we can launch anywhere.
+
+Bug: 223578534
+Test: robotest and manual verify
+Change-Id: I40496105bae313fe5cff2a36dfe329c1e2b5bbe4
+(cherry picked from commit 90e095dbe372f29823ad4788c0cc2d781ae3bb24)
+(cherry picked from commit 019eb77224b0671458ad447f15a2a29935c866c6)
+Merged-In: I40496105bae313fe5cff2a36dfe329c1e2b5bbe4
+---
+ src/com/android/settings/users/AppRestrictionsFragment.java | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/src/com/android/settings/users/AppRestrictionsFragment.java b/src/com/android/settings/users/AppRestrictionsFragment.java
+index c67a687d18..db7612f7f1 100644
+--- a/src/com/android/settings/users/AppRestrictionsFragment.java
++++ b/src/com/android/settings/users/AppRestrictionsFragment.java
+@@ -661,10 +661,7 @@ public class AppRestrictionsFragment extends SettingsPreferenceFragment implemen
+         }
+ 
+         private void assertSafeToStartCustomActivity(Intent intent) {
+-            // Activity can be started if it belongs to the same app
+-            if (intent.getPackage() != null && intent.getPackage().equals(packageName)) {
+-                return;
+-            }
++            EventLog.writeEvent(0x534e4554, "223578534", -1 /* UID */, "");
+             ResolveInfo resolveInfo = mPackageManager.resolveActivity(
+                     intent, PackageManager.MATCH_DEFAULT_ONLY);
+ 
+-- 
+2.34.1
+

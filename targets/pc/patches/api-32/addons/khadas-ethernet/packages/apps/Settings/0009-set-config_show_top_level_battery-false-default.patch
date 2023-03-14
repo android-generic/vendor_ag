@@ -1,0 +1,26 @@
+From df701f98f7e0d7139facef818337940bdae5d89b Mon Sep 17 00:00:00 2001
+From: Goenjoy Huang <goenjoy@khadas.com>
+Date: Thu, 15 Dec 2022 11:11:48 +0800
+Subject: [PATCH 9/9] set config_show_top_level_battery = false default
+
+Signed-off-by: Goenjoy Huang <goenjoy@khadas.com>
+---
+ res/values/config.xml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/res/values/config.xml b/res/values/config.xml
+index 987eaf9725..d5e4e4db07 100755
+--- a/res/values/config.xml
++++ b/res/values/config.xml
+@@ -435,7 +435,7 @@
+     <bool name="config_show_top_level_accessibility">true</bool>
+ 
+     <!-- Whether top_level_battery should be shown or not. -->
+-    <bool name="config_show_top_level_battery">true</bool>
++    <bool name="config_show_top_level_battery">false</bool>
+ 
+     <!-- Whether top_level_connected_devices should be shown or not. -->
+     <bool name="config_show_top_level_connected_devices">true</bool>
+-- 
+2.34.1
+

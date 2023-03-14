@@ -1,0 +1,39 @@
+From 1d8e2e7729d867f38d1165371202af153d4f3142 Mon Sep 17 00:00:00 2001
+From: Chih-Wei Huang <cwhuang@linux.org.tw>
+Date: Fri, 8 Mar 2019 15:53:42 +0800
+Subject: [PATCH 46/54] HID: core: add e-tab id and add it to generic group
+
+Signed-off-by: Chih-Wei Huang <cwhuang@linux.org.tw>
+---
+ drivers/hid/hid-core.c | 3 +++
+ drivers/hid/hid-ids.h  | 2 ++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/drivers/hid/hid-core.c b/drivers/hid/hid-core.c
+index dbed2524fd47..c10bd43dfe04 100644
+--- a/drivers/hid/hid-core.c
++++ b/drivers/hid/hid-core.c
+@@ -917,6 +917,9 @@ static int hid_scan_report(struct hid_device *hid)
+ 				 */
+ 				hid->group = HID_GROUP_RMI;
+ 		break;
++	case USB_VENDOR_ID_ETAB:
++		hid->group = HID_GROUP_GENERIC;
++		break;
+ 	}
+ 
+ 	kfree(parser->collection_stack);
+diff --git a/drivers/hid/hid-ids.h b/drivers/hid/hid-ids.h
+index b61c68817b6b..2081cb73d573 100644
+--- a/drivers/hid/hid-ids.h
++++ b/drivers/hid/hid-ids.h
+@@ -1370,4 +1370,6 @@
+ #define USB_VENDOR_ID_SIGNOTEC			0x2133
+ #define USB_DEVICE_ID_SIGNOTEC_VIEWSONIC_PD1011	0x0018
+ 
++#define USB_VENDOR_ID_ETAB		0x1018	/* E-tab touchpad */
++
+ #endif
+-- 
+2.34.1
+

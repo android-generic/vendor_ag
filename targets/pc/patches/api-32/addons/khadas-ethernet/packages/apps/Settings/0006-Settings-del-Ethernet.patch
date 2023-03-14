@@ -1,0 +1,56 @@
+From c08feefea72a7b4e51232d793da6a1a6126e57a8 Mon Sep 17 00:00:00 2001
+From: Haylrn Zhao <haylrn.zhao@wesion.com>
+Date: Tue, 18 Oct 2022 10:47:21 +0800
+Subject: [PATCH 6/9] Settings: del Ethernet
+
+Signed-off-by: Haylrn Zhao <haylrn.zhao@wesion.com>
+---
+ res/xml/network_and_internet.xml      | 4 ++--
+ res/xml/network_provider_internet.xml | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 res/xml/network_and_internet.xml
+ mode change 100644 => 100755 res/xml/network_provider_internet.xml
+
+diff --git a/res/xml/network_and_internet.xml b/res/xml/network_and_internet.xml
+old mode 100644
+new mode 100755
+index b6dc8c0f50..da270361b4
+--- a/res/xml/network_and_internet.xml
++++ b/res/xml/network_and_internet.xml
+@@ -126,11 +126,11 @@
+         android:order="25"
+         settings:controller="com.android.settings.network.AdaptiveConnectivityPreferenceController"/>
+ 
+-    <com.android.settingslib.RestrictedPreference
++    <!--<com.android.settingslib.RestrictedPreference
+         android:fragment="com.android.settings.ethernet.EthernetSettings"
+         android:icon="@drawable/ic_ethernet"
+         android:key="ethernet_settings"
+         android:title="@string/ethernet_settings_title"
+         settings:useAdminDisabledSummary="true"
+-        settings:userRestriction="no_ethernet_settings" />
++        settings:userRestriction="no_ethernet_settings" />-->
+ </PreferenceScreen>
+diff --git a/res/xml/network_provider_internet.xml b/res/xml/network_provider_internet.xml
+old mode 100644
+new mode 100755
+index d80da68849..b22b38c7a9
+--- a/res/xml/network_provider_internet.xml
++++ b/res/xml/network_provider_internet.xml
+@@ -125,11 +125,11 @@
+         android:order="25"
+         settings:controller="com.android.settings.network.AdaptiveConnectivityPreferenceController"/>
+ 
+-    <com.android.settingslib.RestrictedPreference
++    <!--<com.android.settingslib.RestrictedPreference
+         android:fragment="com.android.settings.ethernet.EthernetSettings"
+         android:icon="@drawable/ic_ethernet"
+         android:key="ethernet_settings"
+         android:title="@string/ethernet_settings_title"
+         settings:useAdminDisabledSummary="true"
+-        settings:userRestriction="no_ethernet_settings" />
++        settings:userRestriction="no_ethernet_settings" />-->
+ </PreferenceScreen>
+-- 
+2.34.1
+

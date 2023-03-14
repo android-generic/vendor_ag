@@ -1,0 +1,29 @@
+From 388be4a9ca98e50ff1c599084bb644f17e8646e1 Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Mon, 6 Feb 2023 13:08:07 -0500
+Subject: [PATCH 01/54] Update .gitignore
+
+Change-Id: Ib33f30188740f57139118123972a5a2248cff590
+---
+ .gitignore | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 265959544978..5bcf4aa85fca 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -162,3 +162,10 @@ x509.genkey
+ 
+ # Documentation toolchain
+ sphinx_*/
++
++# Android additions
++configs
++prebuilts
++tools
++usr
++virt
+\ No newline at end of file
+-- 
+2.34.1
+

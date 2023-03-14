@@ -1,0 +1,40 @@
+From 35de548eda2dfc7434abf77bdf885397584dac5c Mon Sep 17 00:00:00 2001
+From: Haylrn Zhao <haylrn.zhao@wesion.com>
+Date: Fri, 26 Aug 2022 11:21:24 +0800
+Subject: [PATCH 4/9] KSettings:modify khadas Settings icon size
+
+Change-Id: If873d12cbd1d22a75aa30139d7d188a9094e2b5a
+Signed-off-by: Haylrn Zhao <haylrn.zhao@wesion.com>
+---
+ res/drawable/ic_homepage_storage.xml | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 res/drawable/ic_homepage_storage.xml
+
+diff --git a/res/drawable/ic_homepage_storage.xml b/res/drawable/ic_homepage_storage.xml
+old mode 100644
+new mode 100755
+index 11032fa61e..dc09ecf8a6
+--- a/res/drawable/ic_homepage_storage.xml
++++ b/res/drawable/ic_homepage_storage.xml
+@@ -19,14 +19,14 @@
+ 
+     <item>
+         <com.android.settingslib.widget.AdaptiveIconShapeDrawable
+-            android:width="@dimen/dashboard_tile_image_size"
+-            android:height="@dimen/dashboard_tile_image_size"
++            android:width="12dp"
++            android:height="12dp"
+             android:color="@color/homepage_storage_background" />
+     </item>
+ 
+     <item
+-        android:width="@dimen/dashboard_tile_foreground_image_size"
+-        android:height="@dimen/dashboard_tile_foreground_image_size"
++        android:width="12dp"
++        android:height="12dp"
+         android:start="@dimen/dashboard_tile_foreground_image_inset"
+         android:top="@dimen/dashboard_tile_foreground_image_inset"
+         android:drawable="@drawable/ic_storage_white" />
+-- 
+2.34.1
+

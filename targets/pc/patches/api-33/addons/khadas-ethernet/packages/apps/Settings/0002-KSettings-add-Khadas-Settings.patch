@@ -1,0 +1,105 @@
+From dfac33ca7e05ef0f5a5130e04087e73752be482f Mon Sep 17 00:00:00 2001
+From: Goenjoy Huang <goenjoy@khadas.com>
+Date: Mon, 1 Aug 2022 16:33:36 +0800
+Subject: [PATCH 2/9] KSettings:add Khadas Settings
+
+Change-Id: I45446b98c50437e61176586b6a0fa503bda68569
+Signed-off-by: Goenjoy Huang <goenjoy@khadas.com>
+---
+ res/values-zh-rCN/strings.xml  |  2 ++
+ res/values-zh-rHK/strings.xml  |  2 ++
+ res/values-zh-rTW/strings.xml  |  2 ++
+ res/values/strings.xml         |  3 +++
+ res/xml/top_level_settings.xml | 11 +++++++++++
+ 5 files changed, 20 insertions(+)
+ mode change 100644 => 100755 res/values-zh-rCN/strings.xml
+ mode change 100644 => 100755 res/values-zh-rHK/strings.xml
+ mode change 100644 => 100755 res/values-zh-rTW/strings.xml
+ mode change 100644 => 100755 res/values/strings.xml
+
+diff --git a/res/values-zh-rCN/strings.xml b/res/values-zh-rCN/strings.xml
+old mode 100644
+new mode 100755
+index fe72d85229..0c9990f926
+--- a/res/values-zh-rCN/strings.xml
++++ b/res/values-zh-rCN/strings.xml
+@@ -405,6 +405,8 @@
+       <item quantity="other">已添加 <xliff:g id="COUNT">%1$d</xliff:g> 个指纹</item>
+       <item quantity="one">已添加 1 个指纹</item>
+     </plurals>
++    <string name="khadas_settings_title">Khadas设置</string>
++    <string name="khadas_settings_summary">Khadas添加的设置选项</string>
+     <string name="security_settings_fingerprint_preference_summary_none" msgid="1044059475710838504"></string>
+     <string name="security_settings_fingerprint_enroll_introduction_title" msgid="7931650601996313070">"设置指纹"</string>
+     <string name="security_settings_fingerprint_enroll_consent_introduction_title" msgid="2278592030102282364">"允许使用指纹解锁功能"</string>
+diff --git a/res/values-zh-rHK/strings.xml b/res/values-zh-rHK/strings.xml
+old mode 100644
+new mode 100755
+index f751c5ba0e..4f5385d01a
+--- a/res/values-zh-rHK/strings.xml
++++ b/res/values-zh-rHK/strings.xml
+@@ -405,6 +405,8 @@
+       <item quantity="other">已新增 <xliff:g id="COUNT">%1$d</xliff:g> 個指紋</item>
+       <item quantity="one">已新增 1 個指紋</item>
+     </plurals>
++    <string name="khadas_settings_title">Khadas設定</string>
++    <string name="khadas_settings_summary">Khadas添加的設定選項</string>
+     <string name="security_settings_fingerprint_preference_summary_none" msgid="1044059475710838504"></string>
+     <string name="security_settings_fingerprint_enroll_introduction_title" msgid="7931650601996313070">"設定指紋"</string>
+     <string name="security_settings_fingerprint_enroll_consent_introduction_title" msgid="2278592030102282364">"允許使用指紋解鎖"</string>
+diff --git a/res/values-zh-rTW/strings.xml b/res/values-zh-rTW/strings.xml
+old mode 100644
+new mode 100755
+index 4c0185cdbe..a72d807baa
+--- a/res/values-zh-rTW/strings.xml
++++ b/res/values-zh-rTW/strings.xml
+@@ -211,6 +211,8 @@
+       <item quantity="other">要移除所選語言嗎？</item>
+       <item quantity="one">要移除所選語言嗎？</item>
+     </plurals>
++    <string name="khadas_settings_title">Khadas設定</string>
++    <string name="khadas_settings_summary">Khadas添加的設定選項</string>
+     <string name="dlg_remove_locales_message" msgid="8110560091134252067">"使用介面的文字會切換成另一種語言。"</string>
+     <string name="dlg_remove_locales_error_title" msgid="5875503658221562572">"無法移除所有語言"</string>
+     <string name="dlg_remove_locales_error_message" msgid="6504279959974675302">"請保留至少一種偏好語言"</string>
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+old mode 100644
+new mode 100755
+index a8f6864eeb..c3082ecab8
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -8183,6 +8183,9 @@
+         <item quantity="other">Show %d hidden items</item>
+     </plurals>
+ 
++    <string name="khadas_settings_title">Khadas settings</string>
++    <string name="khadas_settings_summary">Khadas add some settings</string>
++
+     <!-- Title for setting tile leading to network and Internet settings [CHAR LIMIT=40]-->
+     <string name="network_dashboard_title">Network &amp; internet</string>
+     <!-- Summary for Network and Internet settings, explaining it contains mobile, wifi setting and data usage settings [CHAR LIMIT=NONE]-->
+diff --git a/res/xml/top_level_settings.xml b/res/xml/top_level_settings.xml
+index 59b33f47a7..f489a0a6db 100644
+--- a/res/xml/top_level_settings.xml
++++ b/res/xml/top_level_settings.xml
+@@ -20,6 +20,17 @@
+     xmlns:settings="http://schemas.android.com/apk/res-auto"
+     android:key="top_level_settings">
+ 
++   <com.android.settings.widget.HomepagePreference
++        android:key="top_level_khadas_settings"
++        android:title="@string/khadas_settings_title"
++        android:summary="@string/khadas_settings_summary"
++        android:icon="@drawable/ic_homepage_storage"
++        android:order="-130">
++        <intent
++            android:targetClass="com.khadas.ksettings.MainActivity"
++            android:targetPackage="com.khadas.ksettings"/>
++    </com.android.settings.widget.HomepagePreference>
++
+     <com.android.settings.widget.HomepagePreference
+         android:fragment="com.android.settings.network.NetworkDashboardFragment"
+         android:icon="@drawable/ic_settings_wireless"
+-- 
+2.34.1
+

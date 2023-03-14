@@ -1,0 +1,28 @@
+From a5277310be00caec7d95b78d195f01db55679c02 Mon Sep 17 00:00:00 2001
+From: Goenjoy Huang <goenjoy@khadas.com>
+Date: Thu, 21 Jul 2022 07:05:10 +0000
+Subject: [PATCH 1/9] Remove the pop-up 'tablet is starting' interface after
+ power failure and startup
+
+Change-Id: I1d913f867f18522741f997ce21f366117838d319
+Signed-off-by: Goenjoy Huang <goenjoy@khadas.com>
+---
+ src/com/android/settings/FallbackHome.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/com/android/settings/FallbackHome.java b/src/com/android/settings/FallbackHome.java
+index 40867aa072..8be2ff7010 100644
+--- a/src/com/android/settings/FallbackHome.java
++++ b/src/com/android/settings/FallbackHome.java
+@@ -107,7 +107,7 @@ public class FallbackHome extends Activity {
+     protected void onResume() {
+         super.onResume();
+         if (mProvisioned) {
+-            mHandler.postDelayed(mProgressTimeoutRunnable, PROGRESS_TIMEOUT);
++            //mHandler.postDelayed(mProgressTimeoutRunnable, PROGRESS_TIMEOUT);
+         }
+     }
+ 
+-- 
+2.34.1
+
