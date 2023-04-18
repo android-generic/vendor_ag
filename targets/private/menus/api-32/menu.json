@@ -1,0 +1,20 @@
+{
+  "project": "Android-Generic - PC Options",
+  "version": 0.1,
+  "updated": "2023-01-26T00:00:00.000Z",
+  "debug": true,
+  "options": {
+    "menuEntry": [
+      {
+        "name": "Upload Current Project",
+        "descr": "",
+        "command": "bash vendor/ag/targets/private/scripts/api-32/upload-to-repo/upload-to-repo.sh", 
+        "dependencies": [
+          {
+            "dep": "ls -d .repo"
+          }
+        ]
+      }
+    ]
+  }
+}
