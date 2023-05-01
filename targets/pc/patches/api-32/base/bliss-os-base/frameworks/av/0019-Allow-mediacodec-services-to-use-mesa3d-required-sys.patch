@@ -1,0 +1,72 @@
+From 7f53168d6b6d17d0ebb5712d85c96557b26439f2 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Thu, 17 Feb 2022 11:37:19 +0100
+Subject: [PATCH 04/11] Allow mediacodec services to use mesa3d-required
+ syscalls
+
+- kcmp
+- sched_getaffinity
+
+Change-Id: I7bd1f5916dc664029fa37c697fa12f6cb7940ebf
+---
+ services/mediacodec/seccomp_policy/mediacodec-x86.policy      | 1 +
+ services/mediacodec/seccomp_policy/mediacodec-x86_64.policy   | 1 +
+ services/mediacodec/seccomp_policy/mediaswcodec-x86.policy    | 4 ++++
+ services/mediacodec/seccomp_policy/mediaswcodec-x86_64.policy | 4 ++++
+ 4 files changed, 10 insertions(+)
+
+diff --git a/services/mediacodec/seccomp_policy/mediacodec-x86.policy b/services/mediacodec/seccomp_policy/mediacodec-x86.policy
+index c811e8941e..96fc6dfac7 100644
+--- a/services/mediacodec/seccomp_policy/mediacodec-x86.policy
++++ b/services/mediacodec/seccomp_policy/mediacodec-x86.policy
+@@ -71,6 +71,7 @@ gettid: 1
+ 
+ # Required by mesa3d
+ kcmp: 1
++sched_getaffinity: 1
+ 
+ @include /system/etc/seccomp_policy/crash_dump.x86.policy
+ @include /system/etc/seccomp_policy/code_coverage.x86.policy
+diff --git a/services/mediacodec/seccomp_policy/mediacodec-x86_64.policy b/services/mediacodec/seccomp_policy/mediacodec-x86_64.policy
+index c811e8941e..96fc6dfac7 100644
+--- a/services/mediacodec/seccomp_policy/mediacodec-x86_64.policy
++++ b/services/mediacodec/seccomp_policy/mediacodec-x86_64.policy
+@@ -71,6 +71,7 @@ gettid: 1
+ 
+ # Required by mesa3d
+ kcmp: 1
++sched_getaffinity: 1
+ 
+ @include /system/etc/seccomp_policy/crash_dump.x86.policy
+ @include /system/etc/seccomp_policy/code_coverage.x86.policy
+diff --git a/services/mediacodec/seccomp_policy/mediaswcodec-x86.policy b/services/mediacodec/seccomp_policy/mediaswcodec-x86.policy
+index 9bafe7bc55..d4db015d9c 100644
+--- a/services/mediacodec/seccomp_policy/mediaswcodec-x86.policy
++++ b/services/mediacodec/seccomp_policy/mediaswcodec-x86.policy
+@@ -69,5 +69,9 @@ sched_yield: 1
+ getpid: 1
+ gettid: 1
+ 
++# Required by mesa3d
++kcmp: 1
++sched_getaffinity: 1
++
+ @include /apex/com.android.media.swcodec/etc/seccomp_policy/crash_dump.x86.policy
+ @include /apex/com.android.media.swcodec/etc/seccomp_policy/code_coverage.x86.policy
+diff --git a/services/mediacodec/seccomp_policy/mediaswcodec-x86_64.policy b/services/mediacodec/seccomp_policy/mediaswcodec-x86_64.policy
+index b0ed0402bb..de23fcab21 100644
+--- a/services/mediacodec/seccomp_policy/mediaswcodec-x86_64.policy
++++ b/services/mediacodec/seccomp_policy/mediaswcodec-x86_64.policy
+@@ -69,5 +69,9 @@ sched_yield: 1
+ getpid: 1
+ gettid: 1
+ 
++# Required by mesa3d
++kcmp: 1
++sched_getaffinity: 1
++
+ @include /apex/com.android.media.swcodec/etc/seccomp_policy/crash_dump.x86_64.policy
+ @include /apex/com.android.media.swcodec/etc/seccomp_policy/code_coverage.x86_64.policy
+-- 
+2.34.1
+

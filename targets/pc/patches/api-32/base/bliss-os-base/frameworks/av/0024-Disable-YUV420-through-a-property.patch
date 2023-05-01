@@ -1,0 +1,33 @@
+From 430fff292cdfa767be5e8efd6ebb1d218b3d7b7a Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Mon, 9 Jan 2023 08:48:34 -0500
+Subject: [PATCH 09/11] Disable YUV420 through a property
+
+---
+ media/libstagefright/colorconversion/SoftwareRenderer.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/media/libstagefright/colorconversion/SoftwareRenderer.cpp b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+index 4d889865f1..99753efcba 100644
+--- a/media/libstagefright/colorconversion/SoftwareRenderer.cpp
++++ b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+@@ -135,9 +135,16 @@ void SoftwareRenderer::resetFormatIfChanged(
+             case OMX_COLOR_FormatYUV420SemiPlanar:
+             case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+             {
++                char property[PROPERTY_VALUE_MAX];
++                bool disableYUV = false;
++                if (property_get("ro.yuv420.disable", property, "false") > 0)
++                    if (strcmp(property, "true") == 0)
++                        disableYUV = true;
++                if (!disableYUV) {
+                 halFormat = HAL_PIXEL_FORMAT_YV12;
+                 bufWidth = (mCropWidth + 1) & ~1;
+                 bufHeight = (mCropHeight + 1) & ~1;
++                }
+                 break;
+             }
+ #endif
+-- 
+2.34.1
+

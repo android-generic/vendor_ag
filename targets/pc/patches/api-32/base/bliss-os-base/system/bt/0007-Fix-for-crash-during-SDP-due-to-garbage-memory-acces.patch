@@ -1,0 +1,104 @@
+From 0f94107b4f5f5b2749a08e81d0b048a9da582e1c Mon Sep 17 00:00:00 2001
+From: Aiswarya Cyriac <aiswarya.cyriac@intel.com>
+Date: Tue, 21 Sep 2021 10:15:31 +0530
+Subject: [PATCH 7/7] Fix for crash during SDP due to garbage memory access
+
+Issue: Crash is seen when repeated connection and disconnection
+is made for OPP file transfer. crash happens during SDP result parsing
+
+Root cause: tSDP_PROTOCOL_ELEM pe is not initialized
+
+Change-Id: I230ff89ac30dbddd205297a87d539a34185edfe6
+Tracked-On: OAM-97127
+Signed-off-by: Aiswarya Cyriac <aiswarya.cyriac@intel.com>
+---
+ bta/ag/bta_ag_sdp.cc               | 4 +++-
+ bta/dm/bta_dm_act.cc               | 9 +++++++--
+ bta/hf_client/bta_hf_client_sdp.cc | 5 +++--
+ bta/jv/bta_jv_act.cc               | 4 +++-
+ 4 files changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/bta/ag/bta_ag_sdp.cc b/bta/ag/bta_ag_sdp.cc
+index a37a7c8ab..5aafccff1 100644
+--- a/bta/ag/bta_ag_sdp.cc
++++ b/bta/ag/bta_ag_sdp.cc
+@@ -326,7 +326,9 @@ bool bta_ag_sdp_find_attr(tBTA_AG_SCB* p_scb, tBTA_SERVICE_MASK service) {
+ 
+     /* get scn from proto desc list if initiator */
+     if (p_scb->role == BTA_AG_INT) {
+-      if (SDP_FindProtocolListElemInRec(p_rec, UUID_PROTOCOL_RFCOMM, &pe)) {
++      memset(&pe, 0, sizeof(tSDP_PROTOCOL_ELEM));
++      if ((SDP_FindProtocolListElemInRec(p_rec, UUID_PROTOCOL_RFCOMM, &pe))
++                                                  && (pe.num_params != 0)) {
+         p_scb->peer_scn = (uint8_t)pe.params[0];
+       } else {
+         continue;
+diff --git a/bta/dm/bta_dm_act.cc b/bta/dm/bta_dm_act.cc
+index 689f81fa1..75d4d84e4 100644
+--- a/bta/dm/bta_dm_act.cc
++++ b/bta/dm/bta_dm_act.cc
+@@ -1089,11 +1089,16 @@ void bta_dm_sdp_result(tBTA_DM_MSG* p_data) {
+     do {
+       p_sdp_rec = NULL;
+       if (bta_dm_search_cb.service_index == (BTA_USER_SERVICE_ID + 1)) {
+-        if (p_sdp_rec && SDP_FindProtocolListElemInRec(
+-                             p_sdp_rec, UUID_PROTOCOL_RFCOMM, &pe)) {
++        memset(&pe, 0, sizeof(tSDP_PROTOCOL_ELEM));
++        if (p_sdp_rec && (SDP_FindProtocolListElemInRec(
++                             p_sdp_rec, UUID_PROTOCOL_RFCOMM, &pe))
++                                           && (pe.num_params != 0)) {
+           bta_dm_search_cb.peer_scn = (uint8_t)pe.params[0];
+           scn_found = true;
+         }
++        if (pe.num_params == 0)
++            APPL_TRACE_ERROR("%s pe.num_params = 0", __func__);
++
+       } else {
+         service =
+             bta_service_id_to_uuid_lkup_tbl[bta_dm_search_cb.service_index - 1];
+diff --git a/bta/hf_client/bta_hf_client_sdp.cc b/bta/hf_client/bta_hf_client_sdp.cc
+index db3348179..4a414e6d7 100755
+--- a/bta/hf_client/bta_hf_client_sdp.cc
++++ b/bta/hf_client/bta_hf_client_sdp.cc
+@@ -226,7 +226,7 @@ bool bta_hf_client_sdp_find_attr(tBTA_HF_CLIENT_CB* client_cb) {
+   bool result = false;
+ 
+   client_cb->peer_version = HFP_VERSION_1_1; /* Default version */
+-
++  memset(&pe, 0, sizeof(tSDP_PROTOCOL_ELEM));
+   /* loop through all records we found */
+   while (true) {
+     /* get next record; if none found, we're done */
+@@ -238,7 +238,8 @@ bool bta_hf_client_sdp_find_attr(tBTA_HF_CLIENT_CB* client_cb) {
+ 
+     /* get scn from proto desc list if initiator */
+     if (client_cb->role == BTA_HF_CLIENT_INT) {
+-      if (SDP_FindProtocolListElemInRec(p_rec, UUID_PROTOCOL_RFCOMM, &pe)) {
++      if ((SDP_FindProtocolListElemInRec(p_rec, UUID_PROTOCOL_RFCOMM, &pe))
++                                                   && (pe.num_params != 0)) {
+         client_cb->peer_scn = (uint8_t)pe.params[0];
+       } else {
+         continue;
+diff --git a/bta/jv/bta_jv_act.cc b/bta/jv/bta_jv_act.cc
+index 13fa89953..f110fd69e 100644
+--- a/bta/jv/bta_jv_act.cc
++++ b/bta/jv/bta_jv_act.cc
+@@ -733,12 +733,14 @@ static void bta_jv_start_discovery_cback(tSDP_RESULT result, void* user_data) {
+     if (result == SDP_SUCCESS || result == SDP_DB_FULL) {
+       tSDP_DISC_REC* p_sdp_rec = NULL;
+       tSDP_PROTOCOL_ELEM pe;
++      memset(&pe, 0, sizeof(tSDP_PROTOCOL_ELEM));
+       VLOG(2) << __func__ << ": bta_jv_cb.uuid=" << bta_jv_cb.uuid;
+       p_sdp_rec = SDP_FindServiceUUIDInDb(p_bta_jv_cfg->p_sdp_db,
+                                           bta_jv_cb.uuid, p_sdp_rec);
+       VLOG(2) << __func__ << ": p_sdp_rec=" << p_sdp_rec;
+       if (p_sdp_rec &&
+-          SDP_FindProtocolListElemInRec(p_sdp_rec, UUID_PROTOCOL_RFCOMM, &pe)) {
++          (SDP_FindProtocolListElemInRec(p_sdp_rec, UUID_PROTOCOL_RFCOMM, &pe))
++                                                       && (pe.num_params != 0)) {
+         dcomp.scn = (uint8_t)pe.params[0];
+         status = BTA_JV_SUCCESS;
+       }
+-- 
+2.34.1
+

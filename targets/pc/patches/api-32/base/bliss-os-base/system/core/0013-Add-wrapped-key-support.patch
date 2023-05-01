@@ -1,0 +1,56 @@
+From 15b60050922482df7f114bcebf4bc1245f0e1d0e Mon Sep 17 00:00:00 2001
+From: dianlujitao <dianlujitao@lineageos.org>
+Date: Sun, 15 Sep 2019 19:46:14 +0800
+Subject: [PATCH 13/38] Add wrapped key support
+
+These commits added wrapped key support:
+
+  https://source.codeaurora.org/quic/la/platform/system/core/commit/?h=LA.UM.8.1.r1-08800-sm8150.0&id=ddd34f7b85ea6701d0c62f1e7c6cb98bbef60738
+  https://source.codeaurora.org/quic/la/platform/system/core/commit/?h=LA.UM.8.1.r1-08800-sm8150.0&id=98ee612a86f40a862889347a4f3bb6231fcdb0e0
+  https://source.codeaurora.org/quic/la/platform/system/core/commit/?h=LA.UM.8.1.r1-08800-sm8150.0&id=c69050ee52338339f0eb1a07aa3eeeeeb2e209d9
+
+Although, got either reverted by follow-ups or removed after the big Q merge commit:
+
+  https://source.codeaurora.org/quic/la/platform/system/core/commit/?h=LA.UM.8.1.r1-08800-sm8150.0&id=dd28b6d7f1f44a529a2262d09834da4ca48937f4
+
+Bring in the relevant bits so that system/vold part compiles.
+
+Conflicts:
+	fs_mgr/fs_mgr_fstab.cpp
+	fs_mgr/include_fstab/fstab/fstab.h
+
+Change-Id: Ibdf035e548c3f5085401f60df158c9a327947f33
+(cherry picked from commit 9f03019be92a1ce86910ef20e6372a4785ba56c1)
+Signed-off-by: Volodymyr Zhdanov <wight554@gmail.com>
+---
+ fs_mgr/fs_mgr_fstab.cpp            | 1 +
+ fs_mgr/include_fstab/fstab/fstab.h | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/fs_mgr/fs_mgr_fstab.cpp b/fs_mgr/fs_mgr_fstab.cpp
+index f30fd9b91..986034cc5 100644
+--- a/fs_mgr/fs_mgr_fstab.cpp
++++ b/fs_mgr/fs_mgr_fstab.cpp
+@@ -181,6 +181,7 @@ void ParseFsMgrFlags(const std::string& flags, FstabEntry* entry) {
+         CheckFlag("fsverity", fs_verity);
+         CheckFlag("metadata_csum", ext_meta_csum);
+         CheckFlag("fscompress", fs_compress);
++        CheckFlag("wrappedkey", wrapped_key);
+ 
+ #undef CheckFlag
+ 
+diff --git a/fs_mgr/include_fstab/fstab/fstab.h b/fs_mgr/include_fstab/fstab/fstab.h
+index f33768b9d..0d1e935c0 100644
+--- a/fs_mgr/include_fstab/fstab/fstab.h
++++ b/fs_mgr/include_fstab/fstab/fstab.h
+@@ -86,6 +86,7 @@ struct FstabEntry {
+         bool fs_verity : 1;
+         bool ext_meta_csum : 1;
+         bool fs_compress : 1;
++        bool wrapped_key : 1;
+     } fs_mgr_flags = {};
+ 
+     bool is_encryptable() const {
+-- 
+2.34.1
+

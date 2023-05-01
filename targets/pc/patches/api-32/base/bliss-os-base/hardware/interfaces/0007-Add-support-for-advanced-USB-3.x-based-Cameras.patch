@@ -1,0 +1,46 @@
+From bdda87c36ed2cfe76ce681fbb517806931e9c60a Mon Sep 17 00:00:00 2001
+From: Muhammad Aksar <muhammad.aksar@intel.com>
+Date: Thu, 14 Nov 2019 18:31:41 +0530
+Subject: [PATCH 7/8] Add support for advanced USB 3.x based Cameras
+
+Adding support for most advanced USB bridge
+Cameras like MIPI-CSI to USB and GMSL/SerDes
+to USB camera in the HAL. This Camera can be
+used in applications like Automotive, Consumer-
+electronics, teleconferencing, AI etc.
+
+Avoiding empty frame rate check here since
+this kind of Camera(s) will not give frame rate
+info during the configuration time.
+
+This will patch not effect the normal USB-
+cameras use cases.
+
+Tracked-On: OAM-88590
+Signed-off-by: Muhammad Aksar <muhammad.aksar@intel.com>
+---
+ camera/device/3.4/default/ExternalCameraDevice.cpp | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/camera/device/3.4/default/ExternalCameraDevice.cpp b/camera/device/3.4/default/ExternalCameraDevice.cpp
+index 677b49632..6cd5fdf4f 100644
+--- a/camera/device/3.4/default/ExternalCameraDevice.cpp
++++ b/camera/device/3.4/default/ExternalCameraDevice.cpp
+@@ -946,9 +946,11 @@ void ExternalCameraDevice::updateFpsBounds(
+     }
+ 
+     getFrameRateList(fd, fpsUpperBound, &format);
+-    if (!format.frameRates.empty()) {
+-        outFmts.push_back(format);
+-    }
++    // HAL tries to support even if the Camera sensor retuns
++    // empty supported frame rate list. This will help to
++    // support different types of Cameras since some
++    // USB Cameras will not return the proper frame rates.
++    outFmts.push_back(format);
+ }
+ 
+ void ExternalCameraDevice::initSupportedFormatsLocked(int fd) {
+-- 
+2.34.1
+

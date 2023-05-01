@@ -1,0 +1,43 @@
+From b66dc115522c122bf96bf464edfef7c50a2807ed Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Sat, 3 Dec 2022 02:31:40 +0700
+Subject: [PATCH 40/42] Remove catch RemoteException from F11 freeform
+
+Change-Id: I5a7a15f21a2b1f11f25ca734e51e73272c00e847
+---
+ core/java/com/android/internal/policy/DecorView.java | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/core/java/com/android/internal/policy/DecorView.java b/core/java/com/android/internal/policy/DecorView.java
+index 130684e6f6fe..a5e455bc6cc0 100644
+--- a/core/java/com/android/internal/policy/DecorView.java
++++ b/core/java/com/android/internal/policy/DecorView.java
+@@ -72,7 +72,6 @@ import android.graphics.drawable.ColorDrawable;
+ import android.graphics.drawable.Drawable;
+ import android.graphics.drawable.InsetDrawable;
+ import android.graphics.drawable.LayerDrawable;
+-import android.os.RemoteException;
+ import android.util.DisplayMetrics;
+ import android.util.Log;
+ import android.util.Pair;
+@@ -403,7 +402,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
+                 Window.WindowControllerCallback callback = mWindow.getWindowControllerCallback();
+                 final int windowingMode =
+                         getResources().getConfiguration().windowConfiguration.getWindowingMode();
+-                try {
+                     if (windowingMode == WINDOWING_MODE_FREEFORM && callback != null) {
+                         callback.toggleFreeformWindowingMode();
+                         updateDecorCaptionShade();
+@@ -412,9 +410,6 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
+                         updateDecorCaptionShade();
+                     }
+                     return true;
+-                } catch (RemoteException ex) {
+-                    Log.e(TAG, "Catch exception when process F11", ex);
+-                }
+             }
+             // endregion
+             final Window.Callback cb = mWindow.getCallback();
+-- 
+2.34.1
+

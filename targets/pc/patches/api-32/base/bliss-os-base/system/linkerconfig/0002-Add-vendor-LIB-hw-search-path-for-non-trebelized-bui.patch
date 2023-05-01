@@ -1,0 +1,29 @@
+From 3b848b17f2cd11be038f5a3049a3d15bd41439b5 Mon Sep 17 00:00:00 2001
+From: Mauro Rossi <issor.oruam@gmail.com>
+Date: Mon, 12 Dec 2022 13:40:25 +0100
+Subject: [PATCH 2/3] Add "/vendor/${LIB}/hw" search path for non trebelized
+ builds (s-x86)
+
+Required by libvulkan loader in legacy mode, when (!is_fully_trebelized) is true,
+or vulkan HAL modules will not work with android-x86 non trebelized builds.
+
+Based on suggestion by Micheal Goffioul
+---
+ contents/namespace/systemdefault.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/contents/namespace/systemdefault.cc b/contents/namespace/systemdefault.cc
+index 13b6550..25f9a88 100644
+--- a/contents/namespace/systemdefault.cc
++++ b/contents/namespace/systemdefault.cc
+@@ -108,6 +108,7 @@ Namespace BuildSystemDefaultNamespace([[maybe_unused]] const Context& ctx) {
+     ns.AddSearchPath("/vendor/${LIB}");
+     ns.AddSearchPath("/vendor/${LIB}/arm");
+     ns.AddSearchPath("/vendor/${LIB}/arm/nb");
++    ns.AddSearchPath("/vendor/${LIB}/hw");
+     ns.AddSearchPath("/odm/${LIB}");
+   }
+ 
+-- 
+2.34.1
+

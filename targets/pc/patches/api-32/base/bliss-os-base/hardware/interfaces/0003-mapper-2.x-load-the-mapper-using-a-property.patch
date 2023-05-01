@@ -1,0 +1,62 @@
+From 5911d0c32ba94a4e52e48e8efbbe1de02599a734 Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Mon, 21 Nov 2022 11:16:27 -0500
+Subject: [PATCH 3/8] mapper@2.x : load the mapper using a property
+
+using the same prop "debug.ui.default_mapper" on libui
+
+Change-Id: I1587b8c49ce3b2e09ee4de06d65ef887374345cd
+---
+ graphics/mapper/2.0/default/passthrough.cpp | 6 ++++++
+ graphics/mapper/2.1/default/passthrough.cpp | 6 ++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/graphics/mapper/2.0/default/passthrough.cpp b/graphics/mapper/2.0/default/passthrough.cpp
+index e18b88fb8..faeb49143 100644
+--- a/graphics/mapper/2.0/default/passthrough.cpp
++++ b/graphics/mapper/2.0/default/passthrough.cpp
+@@ -13,12 +13,18 @@
+  * limitations under the License.
+  */
+ 
++#include <cutils/properties.h>
+ #include <android/hardware/graphics/mapper/2.0/IMapper.h>
+ #include <mapper-passthrough/2.0/GrallocLoader.h>
+ 
+ using android::hardware::graphics::mapper::V2_0::IMapper;
+ using android::hardware::graphics::mapper::V2_0::passthrough::GrallocLoader;
+ 
++char default_mapper[PROPERTY_VALUE_MAX];
++
+ extern "C" IMapper* HIDL_FETCH_IMapper(const char* /*name*/) {
++    property_get("debug.ui.default_mapper", default_mapper, "");
++    if (atoi(default_mapper) == 2) {
+     return GrallocLoader::load();
++    } else {return NULL;}
+ }
+diff --git a/graphics/mapper/2.1/default/passthrough.cpp b/graphics/mapper/2.1/default/passthrough.cpp
+index c7f0cf563..cfad9cba9 100644
+--- a/graphics/mapper/2.1/default/passthrough.cpp
++++ b/graphics/mapper/2.1/default/passthrough.cpp
+@@ -13,12 +13,18 @@
+  * limitations under the License.
+  */
+ 
++#include <cutils/properties.h>
+ #include <android/hardware/graphics/mapper/2.1/IMapper.h>
+ #include <mapper-passthrough/2.1/GrallocLoader.h>
+ 
+ using android::hardware::graphics::mapper::V2_1::IMapper;
+ using android::hardware::graphics::mapper::V2_1::passthrough::GrallocLoader;
+ 
++char default_mapper[PROPERTY_VALUE_MAX];
++
+ extern "C" IMapper* HIDL_FETCH_IMapper(const char* /*name*/) {
++    property_get("debug.ui.default_mapper", default_mapper, "");
++    if (atoi(default_mapper) == 2) {
+     return GrallocLoader::load();
++    } else {return NULL;}
+ }
+-- 
+2.34.1
+

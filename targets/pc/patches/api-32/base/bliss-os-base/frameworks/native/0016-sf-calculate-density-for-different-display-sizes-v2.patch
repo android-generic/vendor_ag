@@ -1,0 +1,69 @@
+From 0e3c30c588a88899eb7286d744b101ba867411d7 Mon Sep 17 00:00:00 2001
+From: LordShenron <shen.priyanshu@gmail.com>
+Date: Fri, 26 Nov 2021 18:15:12 +0530
+Subject: [PATCH 16/19] sf: calculate density for different display sizes (v2)
+
+Signed-off-by: LordShenron <shen.priyanshu@gmail.com>
+
+(v2) Changelog:
+     Always use "Native-Android-x86" in ALOGD printouts
+     Remove the never reached second ALOGD in getDensityBasedOnResolution()
+     Add comment /* no-op for targets different from x86 */
+     Print 'display' and 'density' in ALOGD added to getDisplayInfo()
+
+(v3) Changelog:
+     Port to Android 12L (12l-x86)
+
+Change-Id: I0bbd8b754ad9437fbbbb34ca665c6775f33c8f6c
+Signed-off-by: Mauro Rossi <issor.oruam@gmail.com>
+---
+ services/surfaceflinger/SurfaceFlinger.cpp | 25 +++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 16f4ede684..cc7bfdd872 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -246,6 +246,28 @@ struct SCOPED_CAPABILITY UnnecessaryLock {
+ // TODO(b/141333600): Consolidate with DisplayMode::Builder::getDefaultDensity.
+ constexpr float FALLBACK_DENSITY = ACONFIGURATION_DENSITY_TV;
+ 
++float getDensityBasedOnResolution(uint32_t width, uint32_t height){
++    #if defined(__i386__) || defined(__x86_64__)
++    ALOGD("Native-Android-x86: auto set density");
++                   uint32_t area = width*height;
++                    if (area <= 800 * 480) {
++                       return 120.0f;
++                   } else if (area <= 1024 * 600) {
++                       return 130.0f;
++                   } else if (area < 1024 * 768) {
++                       return 140.0f;
++                   } else if (area < 1920 * 1080) {
++                        return 160.0f;
++                   } else if (area < 2560 * 1600) {
++                       return 240.0f;
++                   } else {
++                       return 320.0f;
++                   }
++    #endif
++/* no-op for targets different from x86 */
++    return FALLBACK_DENSITY;
++}
++
+ float getDensityFromProperty(const char* property, bool required) {
+     char value[PROPERTY_VALUE_MAX];
+     const float density = property_get(property, value, nullptr) > 0 ? std::atof(value) : 0.f;
+@@ -1006,8 +1028,9 @@ status_t SurfaceFlinger::getStaticDisplayInfo(const sp<IBinder>& displayToken,
+     if (mEmulatedDisplayDensity) {
+         info->density = mEmulatedDisplayDensity;
+     } else {
++		ALOGD("Native-Android-x86: display %d %d density %f", display->getBounds().getWidth(), display->getBounds().getHeight(), mInternalDisplayDensity);
+         info->density = info->connectionType == ui::DisplayConnectionType::Internal
+-                ? mInternalDisplayDensity
++                ? ((mInternalDisplayDensity < 0.5f || mInternalDisplayDensity == FALLBACK_DENSITY) ? getDensityBasedOnResolution(display->getBounds().getWidth(), display->getBounds().getHeight()) : mInternalDisplayDensity)
+                 : FALLBACK_DENSITY;
+     }
+     info->density /= ACONFIGURATION_DENSITY_MEDIUM;
+-- 
+2.34.1
+

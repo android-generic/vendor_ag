@@ -1,0 +1,99 @@
+From 5be966a70c9bd8c2bb03dfb82940094e24a63ef0 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@gmail.com>
+Date: Wed, 28 Sep 2022 08:13:21 +0200
+Subject: [PATCH 06/11] Add media extensions for FFMPEG codec2 service
+
+A plain buffer is used to transfer extra information from extractor to
+codecs. The buffer is mapped to a custom C2 paramkey.
+
+Backported to r-x86 by hmtheboy154
+01/2022 : Backported to 12l-x86 by hmtheboy154
+
+Change-Id: Id9e36ae90b194b2973ed16af07a9e2b5230aaab7
+---
+ media/codec2/core/include/C2Config.h                        | 6 ++++++
+ media/codec2/sfplugin/CCodecConfig.cpp                      | 5 +++++
+ media/libstagefright/FFMPEGUtil.cpp                         | 1 +
+ media/libstagefright/Utils.cpp                              | 1 +
+ .../libstagefright/include/media/stagefright/MetaDataBase.h | 1 +
+ 5 files changed, 14 insertions(+)
+
+diff --git a/media/codec2/core/include/C2Config.h b/media/codec2/core/include/C2Config.h
+index 2cc7ab7d7d..c723a50c13 100644
+--- a/media/codec2/core/include/C2Config.h
++++ b/media/codec2/core/include/C2Config.h
+@@ -270,6 +270,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
+ 
+     // encoding quality requirements
+     kParamIndexEncodingQualityLevel, // encoders, enum
++    // FFMPEG
++    kParamIndexRawCodecData,
+ };
+ 
+ }
+@@ -2410,6 +2412,10 @@ C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
+     NONE = 0,
+     S_HANDHELD = 1              // corresponds to VMAF=70
+ );
++// FFMPEG
++
++typedef C2StreamParam<C2Info, C2BlobValue, kParamIndexRawCodecData> C2StreamRawCodecDataInfo;
++constexpr char C2_PARAMKEY_RAW_CODEC_DATA[] = "coded.raw-codec-data";
+ 
+ /// @}
+ 
+diff --git a/media/codec2/sfplugin/CCodecConfig.cpp b/media/codec2/sfplugin/CCodecConfig.cpp
+index 09e24bef29..ce35d0ebdf 100644
+--- a/media/codec2/sfplugin/CCodecConfig.cpp
++++ b/media/codec2/sfplugin/CCodecConfig.cpp
+@@ -958,6 +958,11 @@ void CCodecConfig::initializeStandardParams() {
+     KEY_AUDIO_SESSION_ID // we use "audio-hw-sync"
+     KEY_OUTPUT_REORDER_DEPTH
+     */
++
++    // FFMPEG
++
++    add(ConfigMapper("raw-codec-data", C2_PARAMKEY_RAW_CODEC_DATA, "value")
++        .limitTo(D::DECODER & D::CODED));
+ }
+ 
+ status_t CCodecConfig::initialize(
+diff --git a/media/libstagefright/FFMPEGUtil.cpp b/media/libstagefright/FFMPEGUtil.cpp
+index 76a7658520..1958196b83 100644
+--- a/media/libstagefright/FFMPEGUtil.cpp
++++ b/media/libstagefright/FFMPEGUtil.cpp
+@@ -46,6 +46,7 @@ static const MetaKeyEntry MetaKeyTable[] {
+    {kKeyCodecId              , "codec-id"               , INT32},
+    {kKeyCodedSampleBits      , "coded-sample-bits"      , INT32},
+    {kKeyFileFormat           , "file-format"            , INT32},
++   {kKeyRawCodecData         , "raw-codec-data"         , DATA},
+    {kKeyRawCodecSpecificData , "raw-codec-specific-data", CSD},
+    {kKeyPcmEncoding          , "pcm-encoding"           , INT32},
+    {kKeyRVVersion            , "rv-version"             , INT32},
+diff --git a/media/libstagefright/Utils.cpp b/media/libstagefright/Utils.cpp
+index 2ec4f14bc2..93cbb9d41a 100644
+--- a/media/libstagefright/Utils.cpp
++++ b/media/libstagefright/Utils.cpp
+@@ -806,6 +806,7 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
+         { "slow-motion-markers", kKeySlowMotionMarkers },
+         { "thumbnail-csd-av1c", kKeyThumbnailAV1C },
+         // FFMEG
++        { "raw-codec-data", kKeyRawCodecData },
+         { "raw-codec-specific-data", kKeyRawCodecSpecificData },
+     }
+ };
+diff --git a/media/libstagefright/include/media/stagefright/MetaDataBase.h b/media/libstagefright/include/media/stagefright/MetaDataBase.h
+index cddd59ecb6..0da9d4294e 100644
+--- a/media/libstagefright/include/media/stagefright/MetaDataBase.h
++++ b/media/libstagefright/include/media/stagefright/MetaDataBase.h
+@@ -143,6 +143,7 @@ enum {
+ 
+     kKeyIsUnreadable      = 'unre',  // bool (int32_t)
+ 
++    kKeyRawCodecData         = 'rcdt',
+     kKeyRawCodecSpecificData = 'rcsd',  // raw data - added to support mmParser
+     kKeyDivXVersion       = 'DivX',  // int32_t
+     kKeyDivXDrm           = 'QDrm',  // void *
+-- 
+2.34.1
+

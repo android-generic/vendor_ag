@@ -1,0 +1,29 @@
+From 1cd767a6bd3e6d4f0e4632f8ffa0213d19c6ad5f Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Thu, 22 Dec 2022 14:13:11 -0500
+Subject: [PATCH 37/38] core: add bliss to product allowed sources
+
+Based on WayDroid "core: Add waydroid to product allowed sources"
+---
+ init/property_service.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/init/property_service.cpp b/init/property_service.cpp
+index aea7fcb76..77bd9c94f 100644
+--- a/init/property_service.cpp
++++ b/init/property_service.cpp
+@@ -804,9 +804,9 @@ static void property_initialize_ro_product_props() {
+             "brand", "device", "manufacturer", "model", "name",
+     };
+     const char* RO_PRODUCT_PROPS_ALLOWED_SOURCES[] = {
+-            "odm", "product", "system_ext", "system", "vendor",
++            "bliss", "odm", "product", "system_ext", "system", "vendor",
+     };
+-    const char* RO_PRODUCT_PROPS_DEFAULT_SOURCE_ORDER = "product,odm,vendor,system_ext,system";
++    const char* RO_PRODUCT_PROPS_DEFAULT_SOURCE_ORDER = "bliss,product,odm,vendor,system_ext,system";
+     const std::string EMPTY = "";
+ 
+     std::string ro_product_props_source_order =
+-- 
+2.34.1
+

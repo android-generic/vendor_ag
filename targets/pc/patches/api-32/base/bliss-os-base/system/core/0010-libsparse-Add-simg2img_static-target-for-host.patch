@@ -1,0 +1,43 @@
+From 37faefcd58cecc2cf728e2bfa277457441d49346 Mon Sep 17 00:00:00 2001
+From: Chirayu Desai <chirayudesai1@gmail.com>
+Date: Thu, 17 Mar 2022 04:32:31 +0530
+Subject: [PATCH 10/38] libsparse: Add simg2img_static target for host
+
+* For extract-tools
+
+Change-Id: I15772394a24c2ff1fdd6eece86548a72a5d4d748
+---
+ libsparse/Android.bp | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/libsparse/Android.bp b/libsparse/Android.bp
+index 0b4b640ad..b364437a9 100644
+--- a/libsparse/Android.bp
++++ b/libsparse/Android.bp
+@@ -54,6 +54,23 @@ cc_binary {
+     cflags: ["-Werror"],
+ }
+ 
++cc_binary_host {
++    name: "simg2img_static",
++    srcs: [
++        "simg2img.cpp",
++        "sparse_crc32.cpp",
++    ],
++    static_libs: [
++        "libsparse",
++        "libz",
++        "libbase",
++    ],
++
++    cflags: ["-Werror"],
++    stl: "libc++_static",
++    static_executable: true,
++}
++
+ cc_binary {
+     name: "img2simg",
+     host_supported: true,
+-- 
+2.34.1
+

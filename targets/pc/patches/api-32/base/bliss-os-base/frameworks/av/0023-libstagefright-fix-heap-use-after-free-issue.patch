@@ -1,0 +1,191 @@
+From 42f102d3a9ee67194befae5fa7752f9085969db3 Mon Sep 17 00:00:00 2001
+From: Girish <girishshetty@google.com>
+Date: Wed, 21 Sep 2022 19:18:49 +0000
+Subject: [PATCH 08/11] libstagefright: fix heap use after free issue
+
+Refactor NuMediaExtractor::setDataSource to move
+the common code under a function to reduce code
+duplication.
+And also, fixing a heap based string dereference
+after free in NuMediaExtractor::getName
+
+Bug: 245242273
+Test: atest android.mediav2.cts.ExtractorTest
+      atest MediaSampleReaderNDKTests:MediaSampleReaderNDKTests.MediaSampleReaderNDKTests
+Change-Id: Ie6c663d2df85bee5a2d28a9b709aadf4b6cdd47f
+(cherry picked from commit 9a3fb4bfd9c43edbeac59d8b8f7253140fb5c0c1)
+(cherry picked from commit 2bddcbdd0c25b434920c87d74a11d0d63fd7edea)
+Merged-In: Ie6c663d2df85bee5a2d28a9b709aadf4b6cdd47f
+---
+ media/libstagefright/NuMediaExtractor.cpp     | 95 +++++++------------
+ .../media/stagefright/NuMediaExtractor.h      |  2 +
+ 2 files changed, 36 insertions(+), 61 deletions(-)
+
+diff --git a/media/libstagefright/NuMediaExtractor.cpp b/media/libstagefright/NuMediaExtractor.cpp
+index 68933242a8..2b45f2d16d 100644
+--- a/media/libstagefright/NuMediaExtractor.cpp
++++ b/media/libstagefright/NuMediaExtractor.cpp
+@@ -72,31 +72,17 @@ NuMediaExtractor::~NuMediaExtractor() {
+     }
+ }
+ 
+-status_t NuMediaExtractor::setDataSource(
+-        const sp<MediaHTTPService> &httpService,
+-        const char *path,
+-        const KeyedVector<String8, String8> *headers) {
+-    Mutex::Autolock autoLock(mLock);
+-
+-    if (mImpl != NULL || path == NULL) {
+-        return -EINVAL;
+-    }
+-
+-    sp<DataSource> dataSource =
+-        DataSourceFactory::getInstance()->CreateFromURI(httpService, path, headers);
+-
+-    if (dataSource == NULL) {
+-        return -ENOENT;
+-    }
++status_t NuMediaExtractor::initMediaExtractor(const sp<DataSource>& dataSource) {
++    status_t err = OK;
+ 
+     mImpl = MediaExtractorFactory::Create(dataSource);
+-
+     if (mImpl == NULL) {
++        ALOGE("%s: failed to create MediaExtractor", __FUNCTION__);
+         return ERROR_UNSUPPORTED;
+     }
++
+     setEntryPointToRemoteMediaExtractor();
+ 
+-    status_t err = OK;
+     if (!mCasToken.empty()) {
+         err = mImpl->setMediaCas(mCasToken);
+         if (err != OK) {
+@@ -105,6 +91,10 @@ status_t NuMediaExtractor::setDataSource(
+         }
+     }
+ 
++    // Get the name of the implementation.
++    mName = mImpl->name();
++
++    // Update the duration and bitrate
+     err = updateDurationAndBitrate();
+     if (err == OK) {
+         mDataSource = dataSource;
+@@ -113,6 +103,27 @@ status_t NuMediaExtractor::setDataSource(
+     return OK;
+ }
+ 
++status_t NuMediaExtractor::setDataSource(
++        const sp<MediaHTTPService> &httpService,
++        const char *path,
++        const KeyedVector<String8, String8> *headers) {
++    Mutex::Autolock autoLock(mLock);
++
++    if (mImpl != NULL || path == NULL) {
++        return -EINVAL;
++    }
++
++    sp<DataSource> dataSource =
++        DataSourceFactory::getInstance()->CreateFromURI(httpService, path, headers);
++
++    if (dataSource == NULL) {
++        return -ENOENT;
++    }
++
++    // Initialize MediaExtractor using the data source
++    return initMediaExtractor(dataSource);
++}
++
+ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
+ 
+     ALOGV("setDataSource fd=%d (%s), offset=%lld, length=%lld",
+@@ -131,27 +142,8 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
+         return err;
+     }
+ 
+-    mImpl = MediaExtractorFactory::Create(fileSource);
+-
+-    if (mImpl == NULL) {
+-        return ERROR_UNSUPPORTED;
+-    }
+-    setEntryPointToRemoteMediaExtractor();
+-
+-    if (!mCasToken.empty()) {
+-        err = mImpl->setMediaCas(mCasToken);
+-        if (err != OK) {
+-            ALOGE("%s: failed to setMediaCas (%d)", __FUNCTION__, err);
+-            return err;
+-        }
+-    }
+-
+-    err = updateDurationAndBitrate();
+-    if (err == OK) {
+-        mDataSource = fileSource;
+-    }
+-
+-    return OK;
++    // Initialize MediaExtractor using the file source
++    return initMediaExtractor(fileSource);
+ }
+ 
+ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
+@@ -166,32 +158,13 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
+         return err;
+     }
+ 
+-    mImpl = MediaExtractorFactory::Create(source);
+-
+-    if (mImpl == NULL) {
+-        return ERROR_UNSUPPORTED;
+-    }
+-    setEntryPointToRemoteMediaExtractor();
+-
+-    if (!mCasToken.empty()) {
+-        err = mImpl->setMediaCas(mCasToken);
+-        if (err != OK) {
+-            ALOGE("%s: failed to setMediaCas (%d)", __FUNCTION__, err);
+-            return err;
+-        }
+-    }
+-
+-    err = updateDurationAndBitrate();
+-    if (err == OK) {
+-        mDataSource = source;
+-    }
+-
+-    return err;
++    // Initialize MediaExtractor using the given data source
++    return initMediaExtractor(source);
+ }
+ 
+ const char* NuMediaExtractor::getName() const {
+     Mutex::Autolock autoLock(mLock);
+-    return mImpl == nullptr ? nullptr : mImpl->name().string();
++    return mImpl == nullptr ? nullptr : mName.string();
+ }
+ 
+ static String8 arrayToString(const std::vector<uint8_t> &array) {
+diff --git a/media/libstagefright/include/media/stagefright/NuMediaExtractor.h b/media/libstagefright/include/media/stagefright/NuMediaExtractor.h
+index d17a480bb8..52ea28b9ca 100644
+--- a/media/libstagefright/include/media/stagefright/NuMediaExtractor.h
++++ b/media/libstagefright/include/media/stagefright/NuMediaExtractor.h
+@@ -146,6 +146,7 @@ private:
+     Vector<TrackInfo> mSelectedTracks;
+     int64_t mTotalBitrate;  // in bits/sec
+     int64_t mDurationUs;
++    String8 mName;
+ 
+     void setEntryPointToRemoteMediaExtractor();
+ 
+@@ -165,6 +166,7 @@ private:
+     bool getTotalBitrate(int64_t *bitRate) const;
+     status_t updateDurationAndBitrate();
+     status_t appendVorbisNumPageSamples(MediaBufferBase *mbuf, const sp<ABuffer> &buffer);
++    status_t initMediaExtractor(const sp<DataSource>& dataSource);
+ 
+     DISALLOW_EVIL_CONSTRUCTORS(NuMediaExtractor);
+ };
+-- 
+2.34.1
+

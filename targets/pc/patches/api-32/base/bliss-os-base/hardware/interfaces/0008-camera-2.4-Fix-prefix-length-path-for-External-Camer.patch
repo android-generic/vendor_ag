@@ -1,0 +1,47 @@
+From 1ea4f20985f71525a95a0489b8e782eea3e1c2e5 Mon Sep 17 00:00:00 2001
+From: Avichal Rakesh <arakesh@google.com>
+Date: Thu, 12 Jan 2023 18:15:09 -0800
+Subject: [PATCH 8/8] camera 2.4: Fix prefix length path for External Camera
+ HAL
+
+The default External Camera HAL accidentally used `sizeof` on a `char *`
+to get the length of the string. This "worked" because the string in
+question "/dev/" has length of 5, while on a 32-bit system `char *`
+has a size of 4. This difference of 1 was handled a few lines later.
+
+However on 64-bit system `sizeof(char *)` returns 8 which breaks the
+logic later in code.
+
+As `sizeof` was being used as a proxy for strlen, this CL converts the
+`char *` into a `char[]`. Using `sizeof(char[])` returns the number of
+bytes occupied by the array, which is one more than the length of the
+string when using 8-bit chars.
+
+Bug: 265168485
+Test: Manually tested that the calculated length is correct after the
+      fix.
+Change-Id: I92481a2bcb74fdbbb483ef552168debf07b2d68a
+---
+ .../provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp   | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
+index 64a51f614..19f1604fa 100644
+--- a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
++++ b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
+@@ -41,10 +41,10 @@ namespace {
+ // "device@<version>/external/<id>"
+ const std::regex kDeviceNameRE("device@([0-9]+\\.[0-9]+)/external/(.+)");
+ const int kMaxDevicePathLen = 256;
+-const char* kDevicePath = "/dev/";
++constexpr char kDevicePath[] = "/dev/";
+ constexpr char kPrefix[] = "video";
+ constexpr int kPrefixLen = sizeof(kPrefix) - 1;
+-constexpr int kDevicePrefixLen = sizeof(kDevicePath) + kPrefixLen + 1;
++constexpr int kDevicePrefixLen = sizeof(kDevicePath) + kPrefixLen - 1;
+ 
+ bool matchDeviceName(int cameraIdOffset,
+                      const hidl_string& deviceName, std::string* deviceVersion,
+-- 
+2.34.1
+

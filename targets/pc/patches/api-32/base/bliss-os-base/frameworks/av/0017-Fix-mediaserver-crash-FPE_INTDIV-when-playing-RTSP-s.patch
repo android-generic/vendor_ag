@@ -1,0 +1,31 @@
+From 56cc667c3fbfc8b932ee70ace2d2403804d02007 Mon Sep 17 00:00:00 2001
+From: Michael Goffioul <michael.goffioul@lincor.com>
+Date: Wed, 27 Oct 2021 07:18:45 +0200
+Subject: [PATCH 02/11] Fix mediaserver crash (FPE_INTDIV) when playing RTSP
+ stream
+
+It sounds like a copy-n-paste error between 2 blocks of code: a
+variable seems incorrectly computed and can end up being 0, leading to
+the FPE_INTDIV exception.
+
+Change-Id: If324755268bd2b6ed17ce1fee03e8e5f8163bba0
+---
+ media/libstagefright/rtsp/ARTPConnection.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/media/libstagefright/rtsp/ARTPConnection.cpp b/media/libstagefright/rtsp/ARTPConnection.cpp
+index 83291f3f72..534481ea09 100644
+--- a/media/libstagefright/rtsp/ARTPConnection.cpp
++++ b/media/libstagefright/rtsp/ARTPConnection.cpp
+@@ -1156,7 +1156,7 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
+         mLastBitrateReportTimeUs = nowUs;
+     }
+     else if (mLastEarlyNotifyTimeUs + 100000ll <= nowUs) {
+-        int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
++        int32_t timeDiff = (nowUs - mLastEarlyNotifyTimeUs) / 100000ll;
+         int32_t bitrate = mCumulativeBytes * 8 / timeDiff;
+         mLastEarlyNotifyTimeUs = nowUs;
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,31 @@
+From 8393cc7360613020ea2e931296403ce964bdf370 Mon Sep 17 00:00:00 2001
+From: saranya <saranya.gopal@intel.com>
+Date: Thu, 1 Oct 2020 11:05:53 +0530
+Subject: [PATCH 5/8] health: Health HAL needs Intel healthloop
+
+This is to add Intel healthloop for health service.
+Other than this dependency, AOSP health service itself is
+sufficient.
+
+Signed-off-by: Saranya Gopal <saranya.gopal@intel.com>
+Change-Id: Iccb90c515bee855e07c9c3291616cd6533dc4b22
+---
+ health/2.1/default/Android.bp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/health/2.1/default/Android.bp b/health/2.1/default/Android.bp
+index b7bcea5d1..f5290d410 100644
+--- a/health/2.1/default/Android.bp
++++ b/health/2.1/default/Android.bp
+@@ -38,7 +38,7 @@ cc_defaults {
+     static_libs: [
+         "android.hardware.health@1.0-convert",
+         "libbatterymonitor",
+-        "libhealthloop",
++        "libhealthloop.intel",
+         "libhealth2impl",
+     ],
+ }
+-- 
+2.34.1
+

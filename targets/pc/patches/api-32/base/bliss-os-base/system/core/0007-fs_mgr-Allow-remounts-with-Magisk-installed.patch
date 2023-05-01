@@ -1,0 +1,44 @@
+From aded36311e66e1a28e914d7bd0a3291a5387a6e1 Mon Sep 17 00:00:00 2001
+From: Bruno Martins <bgcngm@gmail.com>
+Date: Sun, 19 Apr 2020 16:28:53 +0100
+Subject: [PATCH 07/38] fs_mgr: Allow remounts with Magisk installed
+
+This allows remount to gracefully mount /system when Magisk
+is installed.
+
+As a sidenote, the ro.debuggable property check can safely
+be removed due to the simple fact that CPP preprocessor flag
+ALLOW_ADBD_DISABLE_VERITY=1 is passed when building
+userdebug/eng.
+
+Change-Id: Ic10eccbf5d225468c3dc42f8ae3ae7c05b49a699
+---
+ fs_mgr/fs_mgr_remount.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/fs_mgr/fs_mgr_remount.cpp b/fs_mgr/fs_mgr_remount.cpp
+index 5411acacf..34a567338 100644
+--- a/fs_mgr/fs_mgr_remount.cpp
++++ b/fs_mgr/fs_mgr_remount.cpp
+@@ -150,7 +150,7 @@ static int do_remount(int argc, char* argv[]) {
+     // If somehow this executable is delivered on a "user" build, it can
+     // not function, so providing a clear message to the caller rather than
+     // letting if fall through and provide a lot of confusing failure messages.
+-    if (!ALLOW_ADBD_DISABLE_VERITY || (android::base::GetProperty("ro.debuggable", "0") != "1")) {
++    if (!ALLOW_ADBD_DISABLE_VERITY) {
+         LOG(ERROR) << "only functions on userdebug or eng builds";
+         return NOT_USERDEBUG;
+     }
+@@ -439,7 +439,8 @@ static int do_remount(int argc, char* argv[]) {
+         fs_mgr_set_blk_ro(blk_device, false);
+ 
+         // Find system-as-root mount point?
+-        if ((mount_point == "/system") && !GetEntryForMountPoint(&mounts, mount_point) &&
++        if ((mount_point == "/system" || mount_point == "/system_root") &&
++            !GetEntryForMountPoint(&mounts, mount_point) &&
+             GetEntryForMountPoint(&mounts, "/")) {
+             mount_point = "/";
+         }
+-- 
+2.34.1
+

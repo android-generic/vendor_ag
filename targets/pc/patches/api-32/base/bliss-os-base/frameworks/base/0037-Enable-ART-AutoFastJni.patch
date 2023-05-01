@@ -1,0 +1,35 @@
+From f3100cee0b6b5cef032fea33b7680fe1f6eab03c Mon Sep 17 00:00:00 2001
+From: bodapati <shalini.salomi.bodapati@intel.com>
+Date: Fri, 24 Sep 2021 11:30:18 +0530
+Subject: [PATCH 37/42] Enable ART AutoFastJni
+
+OAM-99176
+Signed-off-by: bodapati <shalini.salomi.bodapati@intel.com>
+Change-Id: I34eb5c98a05650d2597121fb9352d78e6857e48f
+---
+ core/jni/AndroidRuntime.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/core/jni/AndroidRuntime.cpp b/core/jni/AndroidRuntime.cpp
+index c18d227fa674..94010c811a04 100644
+--- a/core/jni/AndroidRuntime.cpp
++++ b/core/jni/AndroidRuntime.cpp
+@@ -631,6 +631,7 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote, bool p
+     char heapminfreeOptsBuf[sizeof("-XX:HeapMinFree=")-1 + PROPERTY_VALUE_MAX];
+     char heapmaxfreeOptsBuf[sizeof("-XX:HeapMaxFree=")-1 + PROPERTY_VALUE_MAX];
+     char usejitOptsBuf[sizeof("-Xusejit:")-1 + PROPERTY_VALUE_MAX];
++    char autofastjniOptsBuf[sizeof("-XAutoFastJni:")-1 + PROPERTY_VALUE_MAX];
+     char jitpthreadpriorityOptsBuf[sizeof("-Xjitpthreadpriority:")-1 + PROPERTY_VALUE_MAX];
+     char jitmaxsizeOptsBuf[sizeof("-Xjitmaxsize:")-1 + PROPERTY_VALUE_MAX];
+     char jitinitialsizeOptsBuf[sizeof("-Xjitinitialsize:")-1 + PROPERTY_VALUE_MAX];
+@@ -837,6 +838,7 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote, bool p
+      * JIT related options.
+      */
+     parseRuntimeOption("dalvik.vm.usejit", usejitOptsBuf, "-Xusejit:");
++    parseRuntimeOption("dalvik.vm.useautofastjni", autofastjniOptsBuf, "-XAutoFastJni:");
+     parseRuntimeOption("dalvik.vm.jitmaxsize", jitmaxsizeOptsBuf, "-Xjitmaxsize:");
+     parseRuntimeOption("dalvik.vm.jitinitialsize", jitinitialsizeOptsBuf, "-Xjitinitialsize:");
+     parseRuntimeOption("dalvik.vm.jitthreshold", jitthresholdOptsBuf, "-Xjitthreshold:");
+-- 
+2.34.1
+

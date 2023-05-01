@@ -1,0 +1,27 @@
+From e277bf900c8a61d9bdc3343384cafb63a942c2ba Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Fri, 7 Apr 2023 20:48:28 -0400
+Subject: [PATCH 42/42] Raise decor shadow a bit so we can tell which window is
+ focused easier
+
+Change-Id: I84c85cd0071f25cd589a40c0a993cf37734ce54f
+---
+ core/java/com/android/internal/policy/DecorView.java | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/java/com/android/internal/policy/DecorView.java b/core/java/com/android/internal/policy/DecorView.java
+index a5e455bc6cc0..f35c18772a26 100644
+--- a/core/java/com/android/internal/policy/DecorView.java
++++ b/core/java/com/android/internal/policy/DecorView.java
+@@ -136,7 +136,7 @@ public class DecorView extends FrameLayout implements RootViewSurfaceTaker, Wind
+     private static final boolean SWEEP_OPEN_MENU = false;
+ 
+     // The height of a window which has focus in DIP.
+-    public static final int DECOR_SHADOW_FOCUSED_HEIGHT_IN_DIP = 5;
++    public static final int DECOR_SHADOW_FOCUSED_HEIGHT_IN_DIP = 15;
+     // The height of a window which has not in DIP.
+     public static final int DECOR_SHADOW_UNFOCUSED_HEIGHT_IN_DIP = 5;
+ 
+-- 
+2.34.1
+

@@ -1,0 +1,46 @@
+From 0237ff39a9b57b13bbbb458794c19dacab113ae4 Mon Sep 17 00:00:00 2001
+From: Tanuj Tekriwal <tanuj.tekriwal@intel.com>
+Date: Mon, 24 Feb 2020 11:49:20 +0530
+Subject: [PATCH 35/38] Add support for creation of usb printer in android
+
+These changes will allow creation of dev node for usb printer
+connected to android devices
+
+Change-Id: I2c676a924fd703135bfc1b0bbf244a37bb9f8a24
+Tracked-On: None
+Signed-off-by: Tanuj Tekriwal <tanuj.tekriwal@intel.com>
+---
+ init/devices.cpp   | 4 ++++
+ rootdir/ueventd.rc | 1 +
+ 2 files changed, 5 insertions(+)
+
+diff --git a/init/devices.cpp b/init/devices.cpp
+index 369361fbe..b050bf23e 100644
+--- a/init/devices.cpp
++++ b/init/devices.cpp
+@@ -502,6 +502,10 @@ void DeviceHandler::HandleUevent(const Uevent& uevent) {
+             int device_id = uevent.minor % 128 + 1;
+             devpath = StringPrintf("/dev/bus/usb/%03d/%03d", bus_id, device_id);
+         }
++    } else if (uevent.subsystem == "usbmisc") {
++        if (!uevent.device_name.empty()) {
++            devpath = "/dev/" + uevent.device_name;
++        }
+     } else if (StartsWith(uevent.subsystem, "usb")) {
+         // ignore other USB events
+         return;
+diff --git a/rootdir/ueventd.rc b/rootdir/ueventd.rc
+index 633e84cac..a5851ce13 100644
+--- a/rootdir/ueventd.rc
++++ b/rootdir/ueventd.rc
+@@ -43,6 +43,7 @@ subsystem dma_heap
+ /dev/binder               0666   root       root
+ /dev/hwbinder             0666   root       root
+ /dev/vndbinder            0666   root       root
++/dev/usb/lp*		   0666	  root       root
+ 
+ /dev/pmsg0                0222   root       log
+ /dev/dma_heap/system      0444   system     system
+-- 
+2.34.1
+

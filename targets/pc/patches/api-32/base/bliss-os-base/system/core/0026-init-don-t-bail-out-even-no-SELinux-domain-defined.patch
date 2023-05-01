@@ -1,0 +1,37 @@
+From faa4983ca7fc5f1a815ed5c45c39e17c1d23b3fc Mon Sep 17 00:00:00 2001
+From: Chih-Wei Huang <cwhuang@linux.org.tw>
+Date: Tue, 12 Sep 2017 16:22:04 +0800
+Subject: [PATCH 26/38] init: don't bail out even no SELinux domain defined
+
+---
+ init/service.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/init/service.cpp b/init/service.cpp
+index dcb3d0c3c..0b550723f 100644
+--- a/init/service.cpp
++++ b/init/service.cpp
+@@ -88,6 +88,12 @@ static Result<std::string> ComputeContextFromExecutable(const std::string& servi
+         free(new_con);
+     }
+     if (rc == 0 && computed_context == mycon.get()) {
++#if defined(__ANDROID__)
++        LOG(WARNING) << "File " << service_path << "(labeled \"" << filecon.get()
++                     << "\") has incorrect label or no domain transition from " << mycon.get()
++                     << " to another SELinux domain defined.";
++        return "skip";
++#else
+         std::string error = StringPrintf(
+                 "File %s (labeled \"%s\") has incorrect label or no domain transition from %s to "
+                 "another SELinux domain defined. Have you configured your "
+@@ -98,6 +104,7 @@ static Result<std::string> ComputeContextFromExecutable(const std::string& servi
+             return Error() << error;
+         }
+         LOG(ERROR) << error;
++#endif
+     }
+     if (rc < 0) {
+         return Error() << "Could not get process context";
+-- 
+2.34.1
+

@@ -1,0 +1,25 @@
+From 786eb3c00bc4f90dcc7c3ffda66f47f70790d96b Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Thu, 1 Dec 2022 05:05:52 -0500
+Subject: [PATCH 36/38] libmodprobe : Read options in
+ /system/etc/modules.options
+
+---
+ libmodprobe/libmodprobe.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/libmodprobe/libmodprobe.cpp b/libmodprobe/libmodprobe.cpp
+index fda9109f4..431e4fd59 100644
+--- a/libmodprobe/libmodprobe.cpp
++++ b/libmodprobe/libmodprobe.cpp
+@@ -358,6 +358,7 @@ Modprobe::Modprobe(const std::vector<std::string>& base_paths, const std::string
+         auto options_callback = std::bind(&Modprobe::ParseOptionsCallback, this, _1);
+         ParseCfg(release_base_path + "/modules.options", options_callback);
+         ParseCfg(base_path + "/modules.options", options_callback);
++        ParseCfg("/system/etc/modules.options", options_callback);
+ 
+         auto blocklist_callback = std::bind(&Modprobe::ParseBlocklistCallback, this, _1);
+         ParseCfg(release_base_path + "/modules.blocklist", blocklist_callback);
+-- 
+2.34.1
+

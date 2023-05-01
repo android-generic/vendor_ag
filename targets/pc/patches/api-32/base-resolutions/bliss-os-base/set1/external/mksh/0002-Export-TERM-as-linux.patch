@@ -1,0 +1,23 @@
+From 6157e157548ad4c630797f256f801546b08edfcb Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Fri, 7 Apr 2023 18:30:26 -0400
+Subject: [PATCH 2/2] Export TERM as linux
+
+Change-Id: Idb259b739d049858a7075354dae27ba829020025
+---
+ mkshrc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/mkshrc b/mkshrc
+index d50e1c4..2b80176 100644
+--- a/mkshrc
++++ b/mkshrc
+@@ -22,4 +22,4 @@ PS4='[$EPOCHREALTIME] '; PS1='${|
+ 	return $e
+ }$HOSTNAME:${PWD:-?} '"$PS1 "
+ 
+-export TERM=xterm-256color
++export TERM=linux
+-- 
+2.34.1
+

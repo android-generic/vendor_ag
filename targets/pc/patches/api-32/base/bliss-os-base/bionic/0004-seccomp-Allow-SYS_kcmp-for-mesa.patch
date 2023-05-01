@@ -1,0 +1,60 @@
+From 145acec53cc398129499fdc2f21f4d30933e8393 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Sun, 26 Jun 2022 11:22:00 +0200
+Subject: [PATCH 4/4] seccomp: Allow SYS_kcmp for mesa
+
+Change-Id: I93fba0c397259e90bb1829fe0d7a36b52de94023
+---
+ libc/SECCOMP_ALLOWLIST_APP.TXT    | 3 +++
+ libc/SECCOMP_ALLOWLIST_COMMON.TXT | 3 +++
+ libc/SECCOMP_ALLOWLIST_SYSTEM.TXT | 3 +++
+ libc/SYSCALLS.TXT                 | 3 +++
+ 4 files changed, 12 insertions(+)
+
+diff --git a/libc/SECCOMP_ALLOWLIST_APP.TXT b/libc/SECCOMP_ALLOWLIST_APP.TXT
+index ba40b607e..896f7a67c 100644
+--- a/libc/SECCOMP_ALLOWLIST_APP.TXT
++++ b/libc/SECCOMP_ALLOWLIST_APP.TXT
+@@ -56,3 +56,6 @@ int compat_select:_newselect(int n, unsigned long* inp, unsigned long* outp, uns
+ 
+ # b/62090571
+ int mkdir(const char *pathname, mode_t mode)	lp32
++
++# mesa
++int kcmp(pid_t pid1, pid_t pid2, int type, unsigned long idx1, unsigned long idx2) all
+diff --git a/libc/SECCOMP_ALLOWLIST_COMMON.TXT b/libc/SECCOMP_ALLOWLIST_COMMON.TXT
+index 6650d7e32..17304db47 100644
+--- a/libc/SECCOMP_ALLOWLIST_COMMON.TXT
++++ b/libc/SECCOMP_ALLOWLIST_COMMON.TXT
+@@ -74,3 +74,6 @@ int futex_time64(int*, int, int, const timespec64*, int*, int) lp32
+ int sched_rr_get_interval_time64(pid_t, timespec64*) lp32
+ # Since Linux 5.4, not in glibc. Probed for and conditionally used by ART.
+ int userfaultfd(int) all
++
++# mesa
++int kcmp(pid_t pid1, pid_t pid2, int type, unsigned long idx1, unsigned long idx2) all
+diff --git a/libc/SECCOMP_ALLOWLIST_SYSTEM.TXT b/libc/SECCOMP_ALLOWLIST_SYSTEM.TXT
+index 756affed1..1442097f2 100644
+--- a/libc/SECCOMP_ALLOWLIST_SYSTEM.TXT
++++ b/libc/SECCOMP_ALLOWLIST_SYSTEM.TXT
+@@ -4,3 +4,6 @@
+ # This file is processed by a python script named genseccomp.py.
+ 
+ int bpf(int cmd, union bpf_attr *attr, unsigned int size) all
++
++# mesa
++int kcmp(pid_t pid1, pid_t pid2, int type, unsigned long idx1, unsigned long idx2) all
+diff --git a/libc/SYSCALLS.TXT b/libc/SYSCALLS.TXT
+index fe1c4ba74..8d26d2941 100644
+--- a/libc/SYSCALLS.TXT
++++ b/libc/SYSCALLS.TXT
+@@ -365,3 +365,6 @@ ssize_t getrandom(void*, size_t, unsigned) all
+ int __pidfd_open:pidfd_open(pid_t, unsigned int) all
+ int __pidfd_getfd:pidfd_getfd(int, int, unsigned int) all
+ int pidfd_send_signal(int, int, siginfo_t*, unsigned int) all
++
++# mesa
++int kcmp(pid_t pid1, pid_t pid2, int type, unsigned long idx1, unsigned long idx2) all
+-- 
+2.34.1
+

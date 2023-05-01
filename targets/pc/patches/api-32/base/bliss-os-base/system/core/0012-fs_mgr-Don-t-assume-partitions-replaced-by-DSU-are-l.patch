@@ -1,0 +1,28 @@
+From 31aab7c1f061a850843b241475566f82aa47c7fa Mon Sep 17 00:00:00 2001
+From: Tim Zimmermann <tim@linux4.de>
+Date: Sat, 16 Apr 2022 22:37:08 +0200
+Subject: [PATCH 12/38] fs_mgr: Don't assume partitions replaced by DSU are
+ logical already
+
+Test: Boot DSU on a device without dynamic partitions but first_stage_mount for /system
+
+Change-Id: I07f0f40037109aaaf1bce0151d1eac26c971ba9e
+---
+ fs_mgr/fs_mgr_fstab.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/fs_mgr/fs_mgr_fstab.cpp b/fs_mgr/fs_mgr_fstab.cpp
+index f5ab5571f..f30fd9b91 100644
+--- a/fs_mgr/fs_mgr_fstab.cpp
++++ b/fs_mgr/fs_mgr_fstab.cpp
+@@ -666,6 +666,7 @@ void TransformFstabForDsu(Fstab* fstab, const std::string& dsu_slot,
+                 entry->blk_device = partition;
+                 // AVB keys for DSU should always be under kDsuKeysDir.
+                 entry->avb_keys = kDsuKeysDir;
++                entry->fs_mgr_flags.logical = true;
+             }
+             // Make sure the ext4 is included to support GSI.
+             auto partition_ext4 =
+-- 
+2.34.1
+

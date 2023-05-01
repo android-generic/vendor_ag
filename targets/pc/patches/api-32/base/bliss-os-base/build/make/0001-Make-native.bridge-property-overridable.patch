@@ -1,0 +1,37 @@
+From 77c3d1042c732b977f7e3179b0061c7a7685812a Mon Sep 17 00:00:00 2001
+From: Lev Rumyantsev <levarum@google.com>
+Date: Tue, 21 Sep 2021 13:10:00 -0700
+Subject: [PATCH 1/3] Make native.bridge property overridable
+
+When a device uses native bridge, it may be included in the system
+image, so overriding by vendor/build.prop is not an option.
+Example of overriding can be seen here: ag/15881132
+
+Test: build cf_x86_64_phone-userdebug with native-bridge and launch, observe
+1. ro.dalvik.vm.native.bridge=native_bridge.so moved from
+vendor/build.prop to system/build.prop
+2. the prop is correctly set at runtime
+3. translated apps work
+Bug: 197153442
+
+Change-Id: I6cd566dd4e0fac181e309cb7f282d086de09075b
+---
+ target/product/runtime_libart.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/target/product/runtime_libart.mk b/target/product/runtime_libart.mk
+index b511aa6b9..1d52b9f74 100644
+--- a/target/product/runtime_libart.mk
++++ b/target/product/runtime_libart.mk
+@@ -93,7 +93,7 @@ PRODUCT_SYSTEM_PROPERTIES += \
+     dalvik.vm.appimageformat=lz4
+ 
+ PRODUCT_SYSTEM_PROPERTIES += \
+-    ro.dalvik.vm.native.bridge=0
++    ro.dalvik.vm.native.bridge?=0
+ 
+ # Different dexopt types for different package update/install times.
+ # On eng builds, make "boot" reasons only extract for faster turnaround.
+-- 
+2.34.1
+

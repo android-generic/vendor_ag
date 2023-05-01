@@ -1,0 +1,27 @@
+From a6ffa89323581050a1d89723c497bc9444a1162f Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Mon, 12 Dec 2022 02:06:27 +0700
+Subject: [PATCH 4/8] HACK: set kMaxBytesPerPixel to 3 on
+ camera.device@3.4-external-impl
+
+Recommened by Micheal Goffioul
+---
+ .../include/ext_device_v3_4_impl/ExternalCameraDeviceSession.h  | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/camera/device/3.4/default/include/ext_device_v3_4_impl/ExternalCameraDeviceSession.h b/camera/device/3.4/default/include/ext_device_v3_4_impl/ExternalCameraDeviceSession.h
+index 180f0c155..7a190574d 100644
+--- a/camera/device/3.4/default/include/ext_device_v3_4_impl/ExternalCameraDeviceSession.h
++++ b/camera/device/3.4/default/include/ext_device_v3_4_impl/ExternalCameraDeviceSession.h
+@@ -109,7 +109,7 @@ struct ExternalCameraDeviceSession : public virtual RefBase,
+ 
+     static const int kMaxProcessedStream = 2;
+     static const int kMaxStallStream = 1;
+-    static const uint32_t kMaxBytesPerPixel = 2;
++    static const uint32_t kMaxBytesPerPixel = 3;
+ 
+     class OutputThread : public android::Thread {
+     public:
+-- 
+2.34.1
+

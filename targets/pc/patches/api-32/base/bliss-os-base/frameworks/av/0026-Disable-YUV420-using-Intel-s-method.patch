@@ -1,0 +1,96 @@
+From 98025af9d8620ee2cbc6f7fe67a175763789c52d Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Fri, 3 Mar 2023 15:33:09 -0500
+Subject: [PATCH 11/11] Disable YUV420 using Intel's method
+
+It turned out that even Intel is saying that YUV420 planar is not
+supported on virgl.
+
+Intel original patch : https://github.com/projectceladon/vendor-intel-utils/blob/master/aosp_diff/caas_cfc/frameworks/av/0001-Using-RGB565-in-case-YV12-is-not-supported.patch
+
+This commit also revert our "Disable YUV420 through a property" commit
+
+Signed-off-by: hmtheboy154 <buingoc67@gmail.com>
+---
+ .../colorconversion/SoftwareRenderer.cpp      | 25 +++++++++++++------
+ media/ndk/NdkImageReader.cpp                  |  4 +++
+ 2 files changed, 21 insertions(+), 8 deletions(-)
+
+diff --git a/media/libstagefright/colorconversion/SoftwareRenderer.cpp b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+index 540c646b00..330c29411c 100644
+--- a/media/libstagefright/colorconversion/SoftwareRenderer.cpp
++++ b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+@@ -98,6 +98,15 @@ void SoftwareRenderer::resetFormatIfChanged(
+         dataSpaceChangedForPlanar16 = true;
+     }
+ 
++    char property[PROPERTY_VALUE_MAX];
++    bool noYUV = false;
++
++    if (property_get("ro.yuv420.disable", property, "false") > 0) {
++        if (strcmp(property, "true") == 0) {
++            noYUV = true;
++        }
++    }
++
+     if (static_cast<int32_t>(mColorFormat) == colorFormatNew &&
+         mWidth == widthNew &&
+         mHeight == heightNew &&
+@@ -105,7 +114,8 @@ void SoftwareRenderer::resetFormatIfChanged(
+         mCropTop == cropTopNew &&
+         mCropRight == cropRightNew &&
+         mCropBottom == cropBottomNew &&
+-        !dataSpaceChangedForPlanar16) {
++        !dataSpaceChangedForPlanar16 &&
++        !noYUV) {
+         // Nothing changed, no need to reset renderer.
+         return;
+     }
+@@ -134,16 +144,12 @@ void SoftwareRenderer::resetFormatIfChanged(
+             case OMX_COLOR_FormatYUV420SemiPlanar:
+             case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+             {
+-                char property[PROPERTY_VALUE_MAX];
+-                bool disableYUV = false;
+-                if (property_get("ro.yuv420.disable", property, "false") > 0)
+-                    if (strcmp(property, "true") == 0)
+-                        disableYUV = true;
+-                if (!disableYUV) {
++                if (noYUV) {
++                    break;
++                }
+                 halFormat = HAL_PIXEL_FORMAT_YV12;
+                 bufWidth = (mCropWidth + 1) & ~1;
+                 bufHeight = (mCropHeight + 1) & ~1;
+-                }
+                 break;
+             }
+             case OMX_COLOR_Format24bitRGB888:
+@@ -171,6 +177,9 @@ void SoftwareRenderer::resetFormatIfChanged(
+                     // use render engine to convert it to RGB if needed.
+                     halFormat = HAL_PIXEL_FORMAT_RGBA_1010102;
+                 } else {
++                    if (noYUV) {
++                        break;
++                    }
+                     halFormat = HAL_PIXEL_FORMAT_YV12;
+                 }
+                 bufWidth = (mCropWidth + 1) & ~1;
+diff --git a/media/ndk/NdkImageReader.cpp b/media/ndk/NdkImageReader.cpp
+index 1067e24ff2..935cd97eb0 100644
+--- a/media/ndk/NdkImageReader.cpp
++++ b/media/ndk/NdkImageReader.cpp
+@@ -470,6 +470,10 @@ AImageReader::acquireImageLocked(/*out*/AImage** image, /*out*/int* acquireFence
+                 // YUV.
+                 mHalFormat = bufferFmt;
+                 ALOGD("%s: Overriding buffer format YUV_420_888 to 0x%x.", __FUNCTION__, bufferFmt);
++            } else if (readerFmt == HAL_PIXEL_FORMAT_YCbCr_420_888 && bufferFmt == HAL_PIXEL_FORMAT_RGB_565) {
++                //YUV format is not supported on virtio gpu, fall back to RGB565
++                mHalFormat = bufferFmt;
++                ALOGD("%s: Overriding buffer format YUV_420_888 to 0x%x.", __FUNCTION__, bufferFmt);
+             } else {
+                 // Return the buffer to the queue. No need to provide fence, as this buffer wasn't
+                 // used anywhere yet.
+-- 
+2.34.1
+

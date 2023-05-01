@@ -1,0 +1,35 @@
+From c088a4cc36e6aa58333a7bd4706f72ec0c4a1d08 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Mon, 29 Aug 2022 01:55:05 +0200
+Subject: [PATCH 35/42] Add missing shadow outsets for freeform windows
+
+Google forgot to compute these for freeform windows, and only did
+for pip windows.
+
+Change-Id: I5596744786c3b6473395264aea9883edadfd5598
+---
+ services/core/java/com/android/server/wm/Task.java | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/services/core/java/com/android/server/wm/Task.java b/services/core/java/com/android/server/wm/Task.java
+index fd5df6f6c390..2fe5ae77076f 100644
+--- a/services/core/java/com/android/server/wm/Task.java
++++ b/services/core/java/com/android/server/wm/Task.java
+@@ -2238,6 +2238,14 @@ class Task extends TaskFragment {
+             return (int) Math.ceil(
+                     mWmService.dipToPixel(PINNED_WINDOWING_MODE_ELEVATION_IN_DIP, displayMetrics)
+                             * 2);
++        } else if (inMultiWindowMode() && displayContent != null) {
++            final DisplayMetrics displayMetrics = displayContent.getDisplayMetrics();
++
++            // We multiply by two to match the client logic for converting view elevation
++            // to insets, as in {@link WindowManager.LayoutParams#setSurfaceInsets}
++            return (int) Math.ceil(
++                    mWmService.dipToPixel(Math.max(DECOR_SHADOW_FOCUSED_HEIGHT_IN_DIP, DECOR_SHADOW_UNFOCUSED_HEIGHT_IN_DIP), displayMetrics)
++                            * 2);
+         }
+         return 0;
+     }
+-- 
+2.34.1
+

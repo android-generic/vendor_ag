@@ -1,0 +1,43 @@
+From 0f70149bd7a9618da9b1080971c098949f91c130 Mon Sep 17 00:00:00 2001
+From: Jon West <electrikjesus@gmail.com>
+Date: Sat, 11 Mar 2023 15:40:51 -0500
+Subject: [PATCH 41/42] Move suspend to mem action below setWakefulnessLocked
+
+---
+ .../android/server/power/PowerManagerService.java   | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/services/core/java/com/android/server/power/PowerManagerService.java b/services/core/java/com/android/server/power/PowerManagerService.java
+index 03f2eaf406eb..ff5ce256a398 100644
+--- a/services/core/java/com/android/server/power/PowerManagerService.java
++++ b/services/core/java/com/android/server/power/PowerManagerService.java
+@@ -1898,12 +1898,6 @@ public final class PowerManagerService extends SystemService
+             Slog.i(TAG, "Powering off display group due to "
+                     + PowerManager.sleepReasonToString(reason) + " (groupId= " + groupId
+                     + ", uid= " + uid + ")...");
+-            // Adding force suspend code to enter S3 after pressing sleep button
+-			try {
+-				FileUtils.stringToFile("/sys/power/state", "mem");
+-			} catch (IOException e) {
+-				Slog.v(TAG, "IOException: " + e);
+-			}
+ 
+             mDisplayGroupPowerStateMapper.setSandmanSummoned(groupId, true);
+             setWakefulnessLocked(groupId, WAKEFULNESS_DOZING, eventTime, uid, reason,
+@@ -1911,6 +1905,13 @@ public final class PowerManagerService extends SystemService
+             if ((flags & PowerManager.GO_TO_SLEEP_FLAG_NO_DOZE) != 0) {
+                 reallySleepDisplayGroupNoUpdateLocked(groupId, eventTime, uid);
+             }
++
++            // Adding force suspend code to enter S3 after pressing sleep button
++			try {
++				FileUtils.stringToFile("/sys/power/state", "mem");
++			} catch (IOException e) {
++				Slog.v(TAG, "IOException: " + e);
++			}
+         } finally {
+             Trace.traceEnd(Trace.TRACE_TAG_POWER);
+         }
+-- 
+2.34.1
+
