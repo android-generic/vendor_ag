@@ -1,0 +1,102 @@
+From bd219463d02aa3bd88f024e56df4faee3a50a3b8 Mon Sep 17 00:00:00 2001
+From: Roman Stratiienko <roman.o.stratiienko@globallogic.com>
+Date: Tue, 15 Mar 2022 18:02:04 +0200
+Subject: [PATCH] drm_hwcomposer: Fixes for display hotplug / headless mode
+
+Further testing showed that several issues is still present:
+1. Boot without display doesn't work.
+2. Unplug/plug primary display has some flaws due to incomplete
+   HwcDisplay disposal.
+3. In case creation of the pipeline fails, hwcomposer crashes.
+
+This commit aims to address them.
+
+Fixes: bb594baa1c68 ("drm_hwcomposer: Rework HwcDisplay disposal to avoid races")
+Signed-off-by: Roman Stratiienko <roman.o.stratiienko@globallogic.com>
+---
+ drm/ResourceManager.cpp    |  6 ++++--
+ hwc2_device/HwcDisplay.cpp | 28 ++++++++++++++++++++--------
+ hwc2_device/HwcDisplay.h   |  1 +
+ 3 files changed, 25 insertions(+), 10 deletions(-)
+
+diff --git a/drm/ResourceManager.cpp b/drm/ResourceManager.cpp
+index c8235e9..ddf59dd 100644
+--- a/drm/ResourceManager.cpp
++++ b/drm/ResourceManager.cpp
+@@ -136,8 +136,10 @@ void ResourceManager::UpdateFrontendDisplays() {
+ 
+       if (connected) {
+         auto pipeline = DrmDisplayPipeline::CreatePipeline(*conn);
+-        frontend_interface_->BindDisplay(pipeline.get());
+-        attached_pipelines_[conn] = std::move(pipeline);
++        if (pipeline) {
++          frontend_interface_->BindDisplay(pipeline.get());
++          attached_pipelines_[conn] = std::move(pipeline);
++        }
+       } else {
+         auto &pipeline = attached_pipelines_[conn];
+         frontend_interface_->UnbindDisplay(pipeline.get());
+diff --git a/hwc2_device/HwcDisplay.cpp b/hwc2_device/HwcDisplay.cpp
+index cedac19..0f957a7 100644
+--- a/hwc2_device/HwcDisplay.cpp
++++ b/hwc2_device/HwcDisplay.cpp
+@@ -102,24 +102,36 @@ HwcDisplay::HwcDisplay(hwc2_display_t handle, HWC2::DisplayType type,
+ HwcDisplay::~HwcDisplay() = default;
+ 
+ void HwcDisplay::SetPipeline(DrmDisplayPipeline *pipeline) {
++  Deinit();
++
+   pipeline_ = pipeline;
+ 
+-  if (pipeline != nullptr) {
+-    ChosePreferredConfig();
++  if (pipeline != nullptr || handle_ == kPrimaryDisplay) {
+     Init();
+-
+     hwc2_->ScheduleHotplugEvent(handle_, /*connected = */ true);
+   } else {
+-    backend_.reset();
++    hwc2_->ScheduleHotplugEvent(handle_, /*connected = */ false);
++  }
++}
++
++void HwcDisplay::Deinit() {
++  if (pipeline_ != nullptr) {
++    AtomicCommitArgs a_args{};
++    a_args.active = false;
++    a_args.composition = std::make_shared<DrmKmsPlan>();
++    GetPipe().atomic_state_manager->ExecuteAtomicCommit(a_args);
++
+     vsync_worker_.Init(nullptr, [](int64_t) {});
+-    SetClientTarget(nullptr, -1, 0, {});
+-    if (handle_ != kPrimaryDisplay) {
+-      hwc2_->ScheduleHotplugEvent(handle_, /*connected = */ false);
+-    }
++    current_plan_.reset();
++    backend_.reset();
+   }
++
++  SetClientTarget(nullptr, -1, 0, {});
+ }
+ 
+ HWC2::Error HwcDisplay::Init() {
++  ChosePreferredConfig();
++
+   int ret = vsync_worker_.Init(pipeline_, [this](int64_t timestamp) {
+     const std::lock_guard<std::mutex> lock(hwc2_->GetResMan().GetMainLock());
+     if (vsync_event_en_) {
+diff --git a/hwc2_device/HwcDisplay.h b/hwc2_device/HwcDisplay.h
+index 98d8e9b..a9cf589 100644
+--- a/hwc2_device/HwcDisplay.h
++++ b/hwc2_device/HwcDisplay.h
+@@ -230,6 +230,7 @@ class HwcDisplay {
+   std::string DumpDelta(HwcDisplay::Stats delta);
+ 
+   HWC2::Error Init();
++  void Deinit();
+ 
+   HWC2::Error SetActiveConfigInternal(uint32_t config, int64_t change_time);
+ };
+-- 
+2.34.1
+

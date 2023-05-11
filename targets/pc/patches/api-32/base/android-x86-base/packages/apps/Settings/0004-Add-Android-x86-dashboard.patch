@@ -1,4 +1,4 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From fbbc713908048f284174604a77903e9f71ca7060 Mon Sep 17 00:00:00 2001
 From: Chih-Wei Huang <cwhuang@linux.org.tw>
 Date: Fri, 30 Mar 2018 17:40:06 +0800
 Subject: [PATCH 4/4] Add Android-x86 dashboard
@@ -22,11 +22,11 @@ Change-Id: Ib4b1e44b6c8a3b0ee337d9233725e80589c69827
  create mode 100644 src/com/android/settings/system/AndroidX86DashboardFragment.java
 
 diff --git a/AndroidManifest.xml b/AndroidManifest.xml
-index 9b2cf2412a..168993eb3a 100644
+index cbb4e752f9..1b40c35578 100644
 --- a/AndroidManifest.xml
 +++ b/AndroidManifest.xml
-@@ -3331,6 +3331,28 @@
-                        android:value="com.android.settings.applications.AppDashboardFragment"/>
+@@ -3751,6 +3751,28 @@
+                        android:value="@string/menu_key_apps"/>
          </activity>
  
 +        <activity
@@ -55,10 +55,10 @@ index 9b2cf2412a..168993eb3a 100644
              android:name=".Settings$AccountDashboardActivity"
              android:label="@string/account_dashboard_title"
 diff --git a/res/values-zh-rCN/strings.xml b/res/values-zh-rCN/strings.xml
-index 73ee6251a4..a936a167fd 100644
+index e8f485a06b..c4612b4a86 100644
 --- a/res/values-zh-rCN/strings.xml
 +++ b/res/values-zh-rCN/strings.xml
-@@ -2170,6 +2170,10 @@
+@@ -2168,6 +2168,10 @@
      <string name="runningservicedetails_stop_dlg_title" msgid="6201041461740445113">"要停止系统服务吗？"</string>
      <string name="runningservicedetails_stop_dlg_text" product="tablet" msgid="2076922609580490122">"如果停止此服务，您平板电脑上的某些功能也将随之停止工作，并在您将平板电脑关机然后再重新打开后才能使用。"</string>
      <string name="runningservicedetails_stop_dlg_text" product="default" msgid="2625863973434309085">"如果停止此服务，您手机上的某些功能也将随之停止工作，并在您将手机关机然后再重新打开后才能使用。"</string>
@@ -70,10 +70,10 @@ index 73ee6251a4..a936a167fd 100644
      <string name="language_input_gesture_summary_on_with_assist" msgid="8670153838520237089"></string>
      <string name="language_input_gesture_summary_on_non_assist" msgid="2738661322747920463"></string>
 diff --git a/res/values-zh-rHK/strings.xml b/res/values-zh-rHK/strings.xml
-index 4b859bf0b5..d23d4f6190 100644
+index d2dd6d72f0..af5c0a5dc0 100644
 --- a/res/values-zh-rHK/strings.xml
 +++ b/res/values-zh-rHK/strings.xml
-@@ -2172,6 +2172,10 @@
+@@ -2170,6 +2170,10 @@
      <string name="runningservicedetails_stop_dlg_title" msgid="6201041461740445113">"停止系統服務？"</string>
      <string name="runningservicedetails_stop_dlg_text" product="tablet" msgid="2076922609580490122">"如果您停用這項服務，您平板電腦上的某些功能可能會停止正常運作，待您重新開機後才會恢復正常。"</string>
      <string name="runningservicedetails_stop_dlg_text" product="default" msgid="2625863973434309085">"如果您停用這項服務，您手機上的某些功能可能會停止正常運作，待您重新開機後才會恢復正常。"</string>
@@ -85,10 +85,10 @@ index 4b859bf0b5..d23d4f6190 100644
      <string name="language_input_gesture_summary_on_with_assist" msgid="8670153838520237089"></string>
      <string name="language_input_gesture_summary_on_non_assist" msgid="2738661322747920463"></string>
 diff --git a/res/values-zh-rTW/strings.xml b/res/values-zh-rTW/strings.xml
-index 934fec72e6..15f5280baa 100644
+index b63d4c2872..74cd997627 100644
 --- a/res/values-zh-rTW/strings.xml
 +++ b/res/values-zh-rTW/strings.xml
-@@ -2172,6 +2172,10 @@
+@@ -2170,6 +2170,10 @@
      <string name="runningservicedetails_stop_dlg_title" msgid="6201041461740445113">"停止系統服務？"</string>
      <string name="runningservicedetails_stop_dlg_text" product="tablet" msgid="2076922609580490122">"如果你停用這項服務，你的平板電腦上的某些功能可能無法正常運作，待你重新開機後才會恢復正常。"</string>
      <string name="runningservicedetails_stop_dlg_text" product="default" msgid="2625863973434309085">"如果你停用這項服務，你的手機上的某些功能可能無法正常運作，待你重新開機後才會恢復正常。"</string>
@@ -100,10 +100,10 @@ index 934fec72e6..15f5280baa 100644
      <string name="language_input_gesture_summary_on_with_assist" msgid="8670153838520237089"></string>
      <string name="language_input_gesture_summary_on_non_assist" msgid="2738661322747920463"></string>
 diff --git a/res/values/strings.xml b/res/values/strings.xml
-index f8c4fc2c4c..2e0f61a49b 100644
+index 3feda655f3..2edde8ba34 100644
 --- a/res/values/strings.xml
 +++ b/res/values/strings.xml
-@@ -4987,6 +4987,12 @@
+@@ -4984,6 +4984,12 @@
          features of your phone may stop working correctly until you power it off
          and then on again.</string>
  
@@ -149,10 +149,10 @@ index 0000000000..c0561f7fca
 +
 +</PreferenceScreen>
 diff --git a/src/com/android/settings/Settings.java b/src/com/android/settings/Settings.java
-index 404207ddb7..67e37f8413 100644
+index 7154081841..cb04ff0927 100644
 --- a/src/com/android/settings/Settings.java
 +++ b/src/com/android/settings/Settings.java
-@@ -107,6 +107,7 @@ public class Settings extends SettingsActivity {
+@@ -110,6 +110,7 @@ public class Settings extends SettingsActivity {
      public static class MyDeviceInfoActivity extends SettingsActivity { /* empty */ }
      public static class ModuleLicensesActivity extends SettingsActivity { /* empty */ }
      public static class ApplicationSettingsActivity extends SettingsActivity { /* empty */ }
@@ -161,10 +161,10 @@ index 404207ddb7..67e37f8413 100644
      public static class ManageAssistActivity extends SettingsActivity { /* empty */ }
      public static class HighPowerApplicationsActivity extends SettingsActivity { /* empty */ }
 diff --git a/src/com/android/settings/core/gateway/SettingsGateway.java b/src/com/android/settings/core/gateway/SettingsGateway.java
-index d0fb7abaa7..bd7a6bc6fb 100644
+index 804f856a13..399ab78210 100644
 --- a/src/com/android/settings/core/gateway/SettingsGateway.java
 +++ b/src/com/android/settings/core/gateway/SettingsGateway.java
-@@ -145,6 +145,7 @@ import com.android.settings.security.SecuritySettings;
+@@ -149,6 +149,7 @@ import com.android.settings.security.SecuritySettings;
  import com.android.settings.shortcut.CreateShortcut;
  import com.android.settings.sound.MediaControlsSettings;
  import com.android.settings.support.SupportDashboardActivity;
@@ -172,7 +172,7 @@ index d0fb7abaa7..bd7a6bc6fb 100644
  import com.android.settings.system.ResetDashboardFragment;
  import com.android.settings.system.SystemDashboardFragment;
  import com.android.settings.tts.TextToSpeechSettings;
-@@ -295,6 +296,7 @@ public class SettingsGateway {
+@@ -304,6 +305,7 @@ public class SettingsGateway {
              AppDashboardFragment.class.getName(),
              WifiCallingDisclaimerFragment.class.getName(),
              AccountDashboardFragment.class.getName(),
@@ -180,7 +180,7 @@ index d0fb7abaa7..bd7a6bc6fb 100644
              EnterprisePrivacySettings.class.getName(),
              WebViewAppPicker.class.getName(),
              LockscreenDashboardFragment.class.getName(),
-@@ -321,6 +323,7 @@ public class SettingsGateway {
+@@ -331,6 +333,7 @@ public class SettingsGateway {
              Settings.NetworkDashboardActivity.class.getName(),
              Settings.ConnectedDeviceDashboardActivity.class.getName(),
              Settings.AppDashboardActivity.class.getName(),
@@ -249,3 +249,6 @@ index 0000000000..ff3fbf7919
 +        return MetricsEvent.APPLICATION;
 +    }
 +}
+-- 
+2.34.1
+

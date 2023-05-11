@@ -1,7 +1,7 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From ae7e9b616427f2c1cb680afe6a16d35ea7a25efb Mon Sep 17 00:00:00 2001
 From: Chih-Wei Huang <cwhuang@linux.org.tw>
 Date: Sun, 26 Oct 2014 15:39:53 +0800
-Subject: [PATCH 05/15] auto determine the density if not provided in
+Subject: [PATCH 5/5] auto determine the density if not provided in
  surfaceflinger
 
 We hope to support tablet UI for different resolutions.
@@ -11,11 +11,11 @@ So adjust the density according to the resolution.
  1 file changed, 19 insertions(+)
 
 diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
-index e72ca8eec5..1059062ba1 100644
+index 63729f114f..be479eef58 100644
 --- a/services/surfaceflinger/SurfaceFlinger.cpp
 +++ b/services/surfaceflinger/SurfaceFlinger.cpp
-@@ -353,6 +353,25 @@ SurfaceFlinger::SurfaceFlinger(Factory& factory, SkipInitializationTag)
-     mSetInputWindowsListener = new SetInputWindowsListener([&]() { setInputWindowsFinished(); });
+@@ -381,6 +381,25 @@ SurfaceFlinger::SurfaceFlinger(Factory& factory, SkipInitializationTag)
+     ALOGI("Using HWComposer service: %s", mHwcServiceName.c_str());
  }
  
 +// FIXME: What to do with this?
@@ -40,3 +40,6 @@ index e72ca8eec5..1059062ba1 100644
  SurfaceFlinger::SurfaceFlinger(Factory& factory) : SurfaceFlinger(factory, SkipInitialization) {
      ALOGI("SurfaceFlinger is starting");
  
+-- 
+2.34.1
+
