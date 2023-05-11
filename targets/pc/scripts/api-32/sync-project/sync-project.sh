@@ -33,4 +33,4 @@ echo -e "CURRENT_TARGET_PATH: $CURRENT_TARGET_PATH"
 fi
 echo -e "variables set"
 
-repo sync -c --force-sync --no-tags --no-clone-bundle -j$(nproc --all) --optimized-fetch --prune
+repo sync -c --force-sync --no-tags --no-clone-bundle -j4 --optimized-fetch --prune
