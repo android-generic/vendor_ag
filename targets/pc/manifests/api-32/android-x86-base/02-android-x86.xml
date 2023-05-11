@@ -27,30 +27,30 @@
 	<project path="external/busybox" name="platform/external/busybox" remote="x86" revision="q-x86" />
 -->
 	<!-- <project path="external/drm_hwcomposer" name="drm_hwcomposer.git" remote="maurossi" revision="blueprint_pie-x86_y22_w02" /> -->
-	<project path="external/efibootmgr" name="platform/external/efibootmgr" remote="x86" revision="r-x86" />
-	<project path="external/efivar" name="platform/external/efivar" remote="x86" revision="r-x86" />
-	<project path="external/exfat" name="platform/external/exfat" remote="x86" revision="r-x86" />
-	<project path="external/koush/Superuser" name="platform/external/koush/Superuser" remote="x86" revision="r-x86" />
-	<project path="external/koush/Widgets" name="platform/external/koush/Widgets" remote="x86" revision="r-x86" />
-	<project path="external/libncurses" name="platform/external/libncurses" remote="x86" revision="pie-x86" />
-	<project path="external/ntfs-3g" name="platform/external/ntfs-3g" remote="x86" revision="r-x86" />
-	<project path="external/s2tc" name="platform/external/s2tc" remote="x86" revision="r-x86" />
-	<project path="external/v86d" name="platform/external/v86d" remote="x86" revision="r-x86" />
-	<project path="hardware/gps" name="platform/hardware/gps" remote="x86" revision="r-x86" />
+	<project path="external/efibootmgr" name="platform_external_efibootmgr" remote="BR-x86" revision="r-x86" />
+	<project path="external/efivar" name="platform_external_efivar" remote="BR-x86" revision="r-x86" />
+	<project path="external/exfat" name="platform_external_exfat" remote="BR-x86" revision="q-x86" />
+	<project path="external/koush/Superuser" name="platform_external_koush_Superuser" remote="BR-x86" revision="r-x86" />
+	<project path="external/koush/Widgets" name="external_koush_Widgets" remote="BR-x86" revision="r-x86" />
+	<project path="external/libncurses" name="android_external_libncurses" remote="BR-x86" revision="r-x86" />
+	<project path="external/ntfs-3g" name="platform_external_ntfs-3g" remote="BR-x86" revision="r-x86" />
+	<project path="external/s2tc" name="platform_external_s2tc" remote="BR-x86" revision="r-x86" />
+	<project path="external/v86d" name="platform_external_v86d" remote="BR-x86" revision="r-x86" />
+	<project path="hardware/gps" name="platform_hardware_gps" remote="BR-x86" revision="r-x86" />
 	<project path="hardware/intel/audio_media" name="platform/hardware/intel/audio_media" remote="x86" revision="r-x86" />
 	<project path="hardware/intel/common/libva" name="platform/hardware/intel/common/libva" remote="x86" revision="r-x86" />
 	<project path="hardware/intel/common/vaapi" name="platform/hardware/intel/common/vaapi" remote="x86" revision="r-x86" />
 	<project path="hardware/intel/libsensors" name="platform/hardware/intel/libsensors" remote="x86" revision="r-x86" />
-	<project path="hardware/libaudio" name="platform/hardware/libaudio" remote="x86" revision="q-x86" />
-	<project path="hardware/libcamera" name="platform/hardware/libcamera" remote="x86" revision="q-x86" />
-	<project path="hardware/liblights" name="platform/hardware/liblights" remote="x86" revision="r-x86" />
-	<project path="hardware/libsensors" name="platform/hardware/libsensors" remote="x86" revision="r-x86" />
-	<project path="hardware/memtrack" name="platform/hardware/memtrack" remote="x86" revision="r-x86" />
-	<project path="hardware/x86power" name="platform/hardware/x86power" remote="x86" revision="r-x86" />
-	<project path="packages/apps/Eleven" name="platform/packages/apps/Eleven" remote="x86" revision="q-x86" />
+	<project path="hardware/libaudio" name="platform_hardware_libaudio" remote="BR-x86" revision="q-x86" />
+	<project path="hardware/libcamera" name="platform_hardware_libcamera" remote="BR-x86" revision="q-x86" />
+	<project path="hardware/liblights" name="platform_hardware_liblights" remote="BR-x86" revision="r-x86" />
+	<project path="hardware/libsensors" name="platform_hardware_libsensors" remote="BR-x86" revision="r-x86" />
+	<project path="hardware/memtrack" name="platform_hardware_memtrack" remote="BR-x86" revision="r-x86" />
+	<project path="hardware/x86power" name="hardware-x86power" remote="BR-x86" revision="r-x86" />
+	<project path="packages/apps/Eleven" name="platform_packages_apps_Eleven" remote="BR-x86" revision="r-x86" />
 	<!-- <project path="packages/apps/Taskbar" name="Taskbar" remote="maurossi" revision="s-x86" /> -->
 	<!-- <project path="packages/apps/Taskbar" name="platform/packages/apps/Taskbar" remote="x86" revision="r-x86" /> -->
-	<project path="packages/apps/TSCalibration2" name="platform/packages/apps/TSCalibration2" remote="x86" revision="q-x86" />
+	<project path="packages/apps/TSCalibration2" name="BlissRoms-x86/packages_apps_TSCalibration2" remote="ghub" revision="r-x86" />
 	<!-- <project path="prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.11-4.6" name="platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.11-4.6" remote="aosp" revision="emu-1.4-release" /> -->
 	<!-- <project path="vendor/google/chromeos-x86" name="android_vendor_google_chromeos-x86.git" remote="blissroms-x86" revision="13816.82.0_hatch" /> -->
 	<!-- <project path="system/bt" name="platform/system/bt" remote="aosp" /> -->
