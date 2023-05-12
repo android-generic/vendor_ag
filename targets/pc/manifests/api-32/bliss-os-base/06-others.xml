@@ -28,7 +28,7 @@
 	<project path="frameworks/minikin" name="android_frameworks_minikin" groups="pdk-cw-fs,pdk-fs" remote="lineage" />
 	<project path="external/gptfdisk" name="android_external_gptfdisk" groups="pdk" remote="lineage" />
 	<project path="external/htop" name="android_external_htop" remote="lineage" />
-	<project path="external/mksh" name="android_external_mksh" groups="pdk" remote="lineage" />
+	<!-- <project path="external/mksh" name="android_external_mksh" groups="pdk" remote="lineage" /> -->
 	<project path="external/nano" name="android_external_nano" remote="lineage" />
 	<project path="external/ntfs-3g" name="android_external_ntfs-3g" remote="lineage" />
 	<project path="external/openssh" name="android_external_openssh" groups="pdk" remote="lineage" />
