@@ -1,22 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-	<!--
-	<project path="packages/apps/Eleven" name="platform/packages/apps/Eleven" remote="x86" revision="q-x86" />
--->
-<!--
-	<project path="packages/apps/Taskbar" name="platform/packages/apps/Taskbar" remote="x86" revision="q-x86" />
--->
-<!--
-	<project path="prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.11-4.6" name="platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.11-4.6" remote="aosp" revision="master" />
--->
-  <!--
-	<project path="external/llvm-project" name="toolchain/llvm-project"  groups="pdk" remote="aosp" revision="android12-release" />
--->
-<!--
-	<project path="external/llvm-project" name="llvm-project" remote="maurossi" revision="release_13.x" />
--->
-<!--
-	<project path="external/llvm_android" name="toolchain/llvm_android"  groups="pdk" remote="aosp" revision="master" />
--->
+<!--MindTheGapps-->
+	<remote name="mindthegapps" fetch="https://gitlab.com/MindTheGapps"  />
 
+	<project path="vendor/gapps" name="vendor_gapps" revision="sigma" remote="mindthegapps" />
+
+<!--SettingsIntelligenceGooglePrebuilt-->
+	<project path="vendor/google/proprietary/SettingsIntelligenceGooglePrebuilt" name="vendor_google_proprietary_SettingsIntelligenceGooglePrebuilt" revision="12l" remote="sg" />
 </manifest>
+

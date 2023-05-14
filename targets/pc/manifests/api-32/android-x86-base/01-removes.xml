@@ -238,4 +238,13 @@
 	<remove-project name="platform/frameworks/opt/car/services" />
 	<remove-project name="platform/external/robolectric-shadows" />
 -->
+	<remove-project name="platform/external/dtc" />
+	<remove-project name="platform/external/expat" />
+	<remove-project name="platform/external/e2fsprogs" />
+	<remove-project name="platform/frameworks/minikin" />
+	<remove-project name="platform/external/gptfdisk" />
+	<remove-project name="platform/external/openssh" />
+	<remove-project name="platform/external/setupcompat" />
+	<remove-project name="platform/external/tinycompress" />
+	<remove-project name="platform/external/wpa_supplicant_8" />
 </manifest>
