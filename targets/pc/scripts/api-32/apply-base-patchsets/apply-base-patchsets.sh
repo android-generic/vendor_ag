@@ -130,11 +130,15 @@ apply_patch() {
 				echo "                trying..."
 				git am -3 "${agvendor}${i}" >& /dev/null
 				if [[ $? == 0 ]]; then
-					echo "                Applying          $i $?"
+          echo -e ${reset}""${reset}
+          echo -e ${ltgreen}"        Applying          $i $?"${reset}
+          echo -e ${reset}""${reset}
 					goodpatch="y"
 					break
 				else
-					echo "                Conflicts          $i"
+					echo -e ${reset}""${reset}
+          echo -e ${ltred}"        Conflicts         $i"${reset}
+          echo -e ${reset}""${reset}
 					git am --abort >& /dev/null
 					conflict="y"
 				fi

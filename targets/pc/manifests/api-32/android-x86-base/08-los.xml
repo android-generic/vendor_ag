@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-<!--MindTheGapps-->
-	<remote name="mindthegapps" fetch="https://gitlab.com/MindTheGapps"  />
 
-	<project path="vendor/gapps" name="vendor_gapps" revision="sigma" remote="mindthegapps" />
+  <remote name="lineage"
+          fetch="https://github.com/LineageOS"
+          revision="lineage-19.1"/>
 
-<!-- Lineage -->
-	<remote name="lineage" fetch="https://github.com/LineageOS" revision="lineage-19.1"/>
+<!-- Remove Packages -->
+
+	<remove-project name="platform/prebuilts/build-tools" />
+	<remove-project name="platform/prebuilts/gcc/darwin-x86/x86/x86_64-linux-android-4.9" />
+	<remove-project name="platform/prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9" />
+
+<!-- LineageOS Additions -->
 
 	<project path="external/chromium-webview/patches" name="android_external_chromium-webview_patches" groups="pdk"  remote="lineage" revision="main" >
 	<linkfile src="Android.mk" dest="external/chromium-webview/Android.mk" />
@@ -36,8 +41,14 @@
 	<project path="external/tinycompress" name="platform/external/tinycompress" groups="pdk" remote="aosp" revision="f690ffd9a988d9a71c7ae80b9260b0bba09e69ae" />
 	<project path="external/vim" name="android_external_vim" remote="lineage" />
 	<project path="external/wpa_supplicant_8" name="android_external_wpa_supplicant_8" groups="pdk" remote="lineage" />
+  
+  <!-- Prebuilts -->
+  <project path="prebuilts/build-tools" name="android_prebuilts_build-tools" remote="lineage" groups="pdk" clone-depth="10" />
+  <project path="prebuilts/extract-tools" name="android_prebuilts_extract-tools" clone-depth="10" remote="lineage" />
+  <project path="prebuilts/tools-lineage" name="android_prebuilts_tools-lineage" clone-depth="10" remote="lineage" />
+  <project path="prebuilts/gcc/darwin-x86/x86/x86_64-linux-android-4.9" name="android_prebuilts_gcc_darwin-x86_x86_x86_64-linux-android-4.9" remote="lineage" groups="pdk,darwin,x86" clone-depth="1" />
+  <project path="prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9" name="android_prebuilts_gcc_linux-x86_x86_x86_64-linux-android-4.9" remote="lineage" groups="pdk,linux,x86" clone-depth="1" />
+  <project path="tools/extract-utils" name="android_tools_extract-utils" remote="lineage" />
+  <project path="external/libncurses" name="android_external_libncurses" remote="lineage" />
 
-<!--SettingsIntelligenceGooglePrebuilt-->
-	<project path="vendor/google/proprietary/SettingsIntelligenceGooglePrebuilt" name="vendor_google_proprietary_SettingsIntelligenceGooglePrebuilt" revision="12l" remote="sg" />
 </manifest>
-

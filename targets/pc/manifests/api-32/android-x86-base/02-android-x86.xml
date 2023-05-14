@@ -29,11 +29,11 @@
 	<!-- <project path="external/drm_hwcomposer" name="drm_hwcomposer.git" remote="maurossi" revision="blueprint_pie-x86_y22_w02" /> -->
 	<project path="external/efibootmgr" name="platform_external_efibootmgr" remote="BR-x86" revision="r-x86" />
 	<project path="external/efivar" name="platform_external_efivar" remote="BR-x86" revision="r-x86" />
-	<project path="external/exfat" name="platform_external_exfat" remote="BR-x86" revision="q-x86" />
+	<!-- <project path="external/exfat" name="platform_external_exfat" remote="BR-x86" revision="q-x86" /> -->
 	<project path="external/koush/Superuser" name="platform_external_koush_Superuser" remote="BR-x86" revision="r-x86" />
 	<project path="external/koush/Widgets" name="external_koush_Widgets" remote="BR-x86" revision="r-x86" />
-	<project path="external/libncurses" name="android_external_libncurses" remote="BR-x86" revision="r-x86" />
-	<project path="external/ntfs-3g" name="platform_external_ntfs-3g" remote="BR-x86" revision="r-x86" />
+	<!-- <project path="external/libncurses" name="android_external_libncurses" remote="BR-x86" revision="r-x86" /> -->
+	<!-- <project path="external/ntfs-3g" name="platform_external_ntfs-3g" remote="BR-x86" revision="r-x86" /> -->
 	<project path="external/s2tc" name="platform_external_s2tc" remote="BR-x86" revision="r-x86" />
 	<project path="external/v86d" name="platform_external_v86d" remote="BR-x86" revision="r-x86" />
 	<project path="hardware/gps" name="platform_hardware_gps" remote="BR-x86" revision="r-x86" />
