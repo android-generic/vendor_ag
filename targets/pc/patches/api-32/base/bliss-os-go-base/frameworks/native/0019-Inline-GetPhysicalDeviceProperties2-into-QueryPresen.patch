@@ -1,0 +1,70 @@
+From e800726c65e1e89114116d45e41a29595303e702 Mon Sep 17 00:00:00 2001
+From: Chris Forbes <chrisforbes@google.com>
+Date: Thu, 22 Jul 2021 13:54:04 -0700
+Subject: [PATCH 19/19] Inline GetPhysicalDeviceProperties2 into
+ QueryPresentationProperties
+
+In general, we implement the 1.1 instance / physical device API as
+preferring to call the native 1.1 function if available; otherwise
+falling back to calling the equivalent GPDP2 function. If the
+underlying driver supports *neither* then any caller of that function
+has already invoked UB by calling it and so falling over is acceptable.
+
+Unfortunately, the loader itself does call vkGetPhysicalDeviceProperties2
+in one case, regardless of what the driver may support, in order to
+determine whether the platform's swapchain implementation should expose
+some features. On a 1.0 driver without the GPDP2 extension, this caused
+trouble.
+
+As a slight further wrinkle, vkGetPhysicalDeviceProperties2 "cannot
+fail", making propagating a failure back up through the loader annoying.
+
+As a workaround, inline the calls to GetPhysicalDeviceProperties2 and
+GetPhysicalDeviceProperties2KHR into QueryPresentationProperties, where
+we can handle our one special case of both function pointers being
+missing but behavior being defined.
+
+Bug: b/192130684
+Bug: 208682099
+Test: TH
+Change-Id: Iff2bae98b7931bed80fafd895cf57061becabd8d
+(cherry picked from commit e056c12782125c3ad5876f3ac7528d9889808675)
+---
+ vulkan/libvulkan/driver.cpp | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/vulkan/libvulkan/driver.cpp b/vulkan/libvulkan/driver.cpp
+index d7fdab5586..cf774fd9b8 100644
+--- a/vulkan/libvulkan/driver.cpp
++++ b/vulkan/libvulkan/driver.cpp
+@@ -979,6 +979,8 @@ VkResult EnumerateInstanceExtensionProperties(
+ void QueryPresentationProperties(
+     VkPhysicalDevice physicalDevice,
+     VkPhysicalDevicePresentationPropertiesANDROID* presentation_properties) {
++    ATRACE_CALL();
++
+     // Request the android-specific presentation properties via GPDP2
+     VkPhysicalDeviceProperties2 properties = {
+         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+@@ -994,7 +996,17 @@ void QueryPresentationProperties(
+     presentation_properties->pNext = nullptr;
+     presentation_properties->sharedImage = VK_FALSE;
+ 
+-    GetPhysicalDeviceProperties2(physicalDevice, &properties);
++    const auto& driver = GetData(physicalDevice).driver;
++
++    if (driver.GetPhysicalDeviceProperties2) {
++        // >= 1.1 driver, supports core GPDP2 entrypoint.
++        driver.GetPhysicalDeviceProperties2(physicalDevice, &properties);
++    } else if (driver.GetPhysicalDeviceProperties2KHR) {
++        // Old driver, but may support presentation properties
++        // if we have the GPDP2 extension. Otherwise, no presentation
++        // properties supported.
++        driver.GetPhysicalDeviceProperties2KHR(physicalDevice, &properties);
++    }
+ }
+ 
+ VkResult EnumerateDeviceExtensionProperties(
+-- 
+2.34.1
+

@@ -1,0 +1,49 @@
+From 7a760bf290c2e52a52b93d2a1b6d79e433100603 Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Fri, 18 Nov 2022 11:19:40 -0500
+Subject: [PATCH 2/8] Disable some services by default
+
+This include :
+- android.hardware.graphics.allocator@2.0-serivce
+- android.hardware.graphics.composer@2.1-service
+- android.hardware.graphics.composer@2.4-service
+
+We will start them using init.sh
+
+Change-Id: Ib6e4a686a38f465d0b88c481288fa5abda8a2009
+---
+ .../default/android.hardware.graphics.allocator@2.0-service.rc   | 1 +
+ .../default/android.hardware.graphics.composer@2.1-service.rc    | 1 +
+ .../default/android.hardware.graphics.composer@2.4-service.rc    | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/graphics/allocator/2.0/default/android.hardware.graphics.allocator@2.0-service.rc b/graphics/allocator/2.0/default/android.hardware.graphics.allocator@2.0-service.rc
+index 038e87c47..9eda0fd05 100644
+--- a/graphics/allocator/2.0/default/android.hardware.graphics.allocator@2.0-service.rc
++++ b/graphics/allocator/2.0/default/android.hardware.graphics.allocator@2.0-service.rc
+@@ -6,3 +6,4 @@ service vendor.gralloc-2-0 /vendor/bin/hw/android.hardware.graphics.allocator@2.
+     group graphics drmrpc
+     capabilities SYS_NICE
+     onrestart restart surfaceflinger
++    disabled
+diff --git a/graphics/composer/2.1/default/android.hardware.graphics.composer@2.1-service.rc b/graphics/composer/2.1/default/android.hardware.graphics.composer@2.1-service.rc
+index cbd589afc..00f64ff26 100644
+--- a/graphics/composer/2.1/default/android.hardware.graphics.composer@2.1-service.rc
++++ b/graphics/composer/2.1/default/android.hardware.graphics.composer@2.1-service.rc
+@@ -6,3 +6,4 @@ service vendor.hwcomposer-2-1 /vendor/bin/hw/android.hardware.graphics.composer@
+     capabilities SYS_NICE
+     onrestart restart surfaceflinger
+     writepid /dev/cpuset/system-background/tasks
++    disabled
+diff --git a/graphics/composer/2.4/default/android.hardware.graphics.composer@2.4-service.rc b/graphics/composer/2.4/default/android.hardware.graphics.composer@2.4-service.rc
+index a296b0aac..ba421bf93 100644
+--- a/graphics/composer/2.4/default/android.hardware.graphics.composer@2.4-service.rc
++++ b/graphics/composer/2.4/default/android.hardware.graphics.composer@2.4-service.rc
+@@ -5,3 +5,4 @@ service vendor.hwcomposer-2-4 /vendor/bin/hw/android.hardware.graphics.composer@
+     capabilities SYS_NICE
+     onrestart restart surfaceflinger
+     writepid /dev/cpuset/system-background/tasks
++    disabled
+-- 
+2.34.1
+

@@ -1,0 +1,56 @@
+From 2e8cf83e5d596fdaeb5c7ce9289979afefe9a07f Mon Sep 17 00:00:00 2001
+From: akodanka <anoob.anto.kodankandath@intel.com>
+Date: Wed, 24 Jun 2020 13:12:52 +0530
+Subject: [PATCH 39/42] Handle simultaneous HDMI & WiredHeadphone events
+
+Wired Headset sets these 2 bits in the device when connected:
+SW_HEADPHONE_INSERT_BIT & SW_MICROPHONE_INSERT_BIT
+Additionally, if HDMI device is connected, it sets the
+SW_LINEOUT_INSERT_BIT event too.
+The combination of these 3 bits has to be handled correctly.
+
+Tracked-On: OAM-91511
+Signed-off-by: akodanka <anoob.anto.kodankandath@intel.com>
+---
+ .../com/android/server/WiredAccessoryManager.java    | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+ mode change 100644 => 100755 services/core/java/com/android/server/WiredAccessoryManager.java
+
+diff --git a/services/core/java/com/android/server/WiredAccessoryManager.java b/services/core/java/com/android/server/WiredAccessoryManager.java
+old mode 100644
+new mode 100755
+index f5776dd14b5a..552f7c705820
+--- a/services/core/java/com/android/server/WiredAccessoryManager.java
++++ b/services/core/java/com/android/server/WiredAccessoryManager.java
+@@ -177,6 +177,14 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
+                     headset = BIT_HEADSET;
+                     break;
+ 
++                case SW_HEADPHONE_INSERT_BIT | SW_LINEOUT_INSERT_BIT:
++                    headset = BIT_HEADSET;
++                    break;
++
++                case SW_HEADPHONE_INSERT_BIT | SW_LINEOUT_INSERT_BIT | SW_MICROPHONE_INSERT_BIT:
++                    headset = BIT_HEADSET;
++                    break;
++
+                 default:
+                     headset = 0;
+                     break;
+@@ -422,11 +430,11 @@ final class WiredAccessoryManager implements WiredAccessoryCallbacks {
+             //
+             // If the kernel does not have an "hdmi_audio" switch, just fall back on the older
+             // "hdmi" switch instead.
+-            uei = new UEventInfo(NAME_HDMI_AUDIO, BIT_HDMI_AUDIO, 0, 0);
++            uei = new UEventInfo(NAME_HDMI_AUDIO, BIT_HDMI_AUDIO, BIT_LINEOUT, 0);
+             if (uei.checkSwitchExists()) {
+                 retVal.add(uei);
+             } else {
+-                uei = new UEventInfo(NAME_HDMI, BIT_HDMI_AUDIO, 0, 0);
++                uei = new UEventInfo(NAME_HDMI, BIT_HDMI_AUDIO, BIT_LINEOUT, 0);
+                 if (uei.checkSwitchExists()) {
+                     retVal.add(uei);
+                 } else {
+-- 
+2.34.1
+

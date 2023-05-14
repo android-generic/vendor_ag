@@ -1,0 +1,44 @@
+From 1dcacaf3a2a5a81f6d188cd666426f9e2761bcad Mon Sep 17 00:00:00 2001
+From: William Bellavance <flintman@flintmancomputers.com>
+Date: Tue, 30 Aug 2016 08:04:38 -0400
+Subject: [PATCH 01/38] init: don't skip starting a service with no domain if
+ permissive
+
+[Adrian DC] Preserve the log while permissive
+
+Change-Id: I3f2887930e15d09014c2594141ba4acbbc8d6d9d
+---
+ init/service.cpp | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/init/service.cpp b/init/service.cpp
+index c3069f5b2..dcb3d0c3c 100644
+--- a/init/service.cpp
++++ b/init/service.cpp
+@@ -88,13 +88,16 @@ static Result<std::string> ComputeContextFromExecutable(const std::string& servi
+         free(new_con);
+     }
+     if (rc == 0 && computed_context == mycon.get()) {
+-        return Error() << "File " << service_path << "(labeled \"" << filecon.get()
+-                       << "\") has incorrect label or no domain transition from " << mycon.get()
+-                       << " to another SELinux domain defined. Have you configured your "
+-                          "service correctly? https://source.android.com/security/selinux/"
+-                          "device-policy#label_new_services_and_address_denials. Note: this "
+-                          "error shows up even in permissive mode in order to make auditing "
+-                          "denials possible.";
++        std::string error = StringPrintf(
++                "File %s (labeled \"%s\") has incorrect label or no domain transition from %s to "
++                "another SELinux domain defined. Have you configured your "
++                "service correctly? https://source.android.com/security/selinux/"
++                "device-policy#label_new_services_and_address_denials",
++                service_path.c_str(), filecon.get(), mycon.get());
++        if (security_getenforce() != 0) {
++            return Error() << error;
++        }
++        LOG(ERROR) << error;
+     }
+     if (rc < 0) {
+         return Error() << "Could not get process context";
+-- 
+2.34.1
+

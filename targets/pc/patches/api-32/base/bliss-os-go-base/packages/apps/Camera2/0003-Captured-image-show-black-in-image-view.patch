@@ -1,0 +1,41 @@
+From 3a6e06671ffb3e8461573a606fb5bfc3add28815 Mon Sep 17 00:00:00 2001
+From: user189 <shiva.kumara.rudrappa@intel.com>
+Date: Thu, 18 Mar 2021 16:27:24 +0530
+Subject: [PATCH 3/3] Captured image show black in image view
+
+with android 11 and target sdk version above 29 files
+not allowed to share with external source. to do this
+need additional access.
+
+Solution : added additional access of MANAGE_EXTERNAL_STORAGE
+to access all media files.
+
+Tracked-On: OAM-96545
+Signed-off-by: shiva kumara R <shiva.kumara.rudrappa@intel.com>
+---
+ AndroidManifest.xml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/AndroidManifest.xml b/AndroidManifest.xml
+index 1305f4744..81156f5bc 100644
+--- a/AndroidManifest.xml
++++ b/AndroidManifest.xml
+@@ -27,6 +27,7 @@
+     <uses-permission android:name="android.permission.WAKE_LOCK" />
+     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+     <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
++    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+ 
+     <supports-screens
+         android:anyDensity="true"
+@@ -44,6 +45,7 @@
+         android:restoreAnyVersion="true"
+         android:supportsRtl="true"
+         android:theme="@style/Theme.Camera"
++        android:requestLegacyExternalStorage="true"
+         android:usesCleartextTraffic="false" >
+         <activity
+             android:name="com.android.camera.CameraActivity"
+-- 
+2.34.1
+

@@ -1,0 +1,39 @@
+From ac235985f1f5937d1825b3b756148ee1e475680c Mon Sep 17 00:00:00 2001
+From: Alessandro <ales.astone@gmail.com>
+Date: Mon, 6 Apr 2020 19:04:11 +0200
+Subject: [PATCH 05/38] core: mark libsysutils and libdiskconfig
+ recovery_available
+
+Change-Id: I4e64c6d3951dac4a424617d8fdf6d37962d3b4f2
+---
+ libdiskconfig/Android.bp | 1 +
+ libsysutils/Android.bp   | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/libdiskconfig/Android.bp b/libdiskconfig/Android.bp
+index a3d643e2c..80a381205 100644
+--- a/libdiskconfig/Android.bp
++++ b/libdiskconfig/Android.bp
+@@ -4,6 +4,7 @@ package {
+ 
+ cc_library {
+     name: "libdiskconfig",
++    recovery_available: true,
+     vendor_available: true,
+     vndk: {
+         enabled: true,
+diff --git a/libsysutils/Android.bp b/libsysutils/Android.bp
+index 5f472b2ab..aadaaf885 100644
+--- a/libsysutils/Android.bp
++++ b/libsysutils/Android.bp
+@@ -4,6 +4,7 @@ package {
+ 
+ cc_library {
+     name: "libsysutils",
++    recovery_available: true,
+     vendor_available: true,
+     vndk: {
+         enabled: true,
+-- 
+2.34.1
+

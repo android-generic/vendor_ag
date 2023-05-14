@@ -1,0 +1,142 @@
+From 50193523b2e1e028a5f3266102941c4680c62979 Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Fri, 18 Nov 2022 10:03:17 -0500
+Subject: [PATCH 18/19] WIP : split allocator & composer HIDL service using a
+ property
+
+this is a plan to support both Gralloc0/1 & Gralloc4 in one single build, this is what I achieved so far
+
+- [x] Split GrallocBufferMapper's preloadHAL & mMapper in GrallocBufferMapper.cpp and GrallocBufferAllocator.cpp using property debug.ui.default_mapper
+- [x] Test and boot with many gralloc including gbm_gralloc & minigbm in gralloc0 and minigbm in gralloc4
+- [  ] Test and boot with many mapper including mapper@2.0-impl-2.1 or mappers from minigbm.
+
+Currently in order to boot you have to pick the mapper that the gralloc use manually by renaming them.
+---
+ libs/ui/GraphicBufferAllocator.cpp | 23 +++++++++++++++++++++
+ libs/ui/GraphicBufferMapper.cpp    | 32 ++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
+
+diff --git a/libs/ui/GraphicBufferAllocator.cpp b/libs/ui/GraphicBufferAllocator.cpp
+index 3f958ba68f..fa35feb879 100644
+--- a/libs/ui/GraphicBufferAllocator.cpp
++++ b/libs/ui/GraphicBufferAllocator.cpp
+@@ -26,6 +26,7 @@
+ #include <grallocusage/GrallocUsageConversion.h>
+ 
+ #include <android-base/stringprintf.h>
++#include <cutils/properties.h>
+ #include <log/log.h>
+ #include <utils/Singleton.h>
+ #include <utils/Trace.h>
+@@ -48,21 +49,43 @@ KeyedVector<buffer_handle_t,
+     GraphicBufferAllocator::alloc_rec_t> GraphicBufferAllocator::sAllocList;
+ 
+ GraphicBufferAllocator::GraphicBufferAllocator() : mMapper(GraphicBufferMapper::getInstance()) {
++    char default_gralloc[PROPERTY_VALUE_MAX]; 
++    property_get("debug.ui.default_mapper", default_gralloc, "");
++    if (atoi(default_gralloc) == 4) {
+     mAllocator = std::make_unique<const Gralloc4Allocator>(
+             reinterpret_cast<const Gralloc4Mapper&>(mMapper.getGrallocMapper()));
+     if (mAllocator->isLoaded()) {
+         return;
+     }
++    } else if (atoi(default_gralloc) == 3) {
+     mAllocator = std::make_unique<const Gralloc3Allocator>(
+             reinterpret_cast<const Gralloc3Mapper&>(mMapper.getGrallocMapper()));
+     if (mAllocator->isLoaded()) {
+         return;
+     }
++    } else if (atoi(default_gralloc) == 2) {
+     mAllocator = std::make_unique<const Gralloc2Allocator>(
+             reinterpret_cast<const Gralloc2Mapper&>(mMapper.getGrallocMapper()));
+     if (mAllocator->isLoaded()) {
+         return;
+     }
++    } else {
++    mAllocator = std::make_unique<const Gralloc4Allocator>(
++            reinterpret_cast<const Gralloc4Mapper&>(mMapper.getGrallocMapper()));
++    if (mAllocator->isLoaded()) {
++        return;
++    }
++    mAllocator = std::make_unique<const Gralloc3Allocator>(
++            reinterpret_cast<const Gralloc3Mapper&>(mMapper.getGrallocMapper()));
++    if (mAllocator->isLoaded()) {
++        return;
++    }
++    mAllocator = std::make_unique<const Gralloc2Allocator>(
++            reinterpret_cast<const Gralloc2Mapper&>(mMapper.getGrallocMapper()));
++    if (mAllocator->isLoaded()) {
++        return;
++    }
++    } //debug.ui.default_gralloc
+ 
+     LOG_ALWAYS_FATAL("gralloc-allocator is missing");
+ }
+diff --git a/libs/ui/GraphicBufferMapper.cpp b/libs/ui/GraphicBufferMapper.cpp
+index a45d50174a..1c74b1b914 100644
+--- a/libs/ui/GraphicBufferMapper.cpp
++++ b/libs/ui/GraphicBufferMapper.cpp
+@@ -29,6 +29,7 @@
+ #include <sync/sync.h>
+ #pragma clang diagnostic pop
+ 
++#include <cutils/properties.h>
+ #include <utils/Log.h>
+ #include <utils/Trace.h>
+ 
+@@ -44,14 +45,44 @@ namespace android {
+ // ---------------------------------------------------------------------------
+ 
+ ANDROID_SINGLETON_STATIC_INSTANCE( GraphicBufferMapper )
++char default_mapper[PROPERTY_VALUE_MAX]; 
+ 
+ void GraphicBufferMapper::preloadHal() {
++    property_get("debug.ui.default_mapper", default_mapper, "");
++    if (atoi(default_mapper) == 2) {
+     Gralloc2Mapper::preload();
++    } else if (atoi(default_mapper) == 3) {
+     Gralloc3Mapper::preload();
++    } else if (atoi(default_mapper) == 4) {
+     Gralloc4Mapper::preload();
++    } else {
++    Gralloc2Mapper::preload();
++    Gralloc3Mapper::preload();
++    Gralloc4Mapper::preload();
++    }
+ }
+ 
+ GraphicBufferMapper::GraphicBufferMapper() {
++    property_get("debug.ui.default_mapper", default_mapper, "");
++    if (atoi(default_mapper) == 4) {
++        mMapper = std::make_unique<const Gralloc4Mapper>();
++        if (mMapper->isLoaded()) {
++            mMapperVersion = Version::GRALLOC_4;
++            return;
++        }
++    } else if (atoi(default_mapper) == 3) {
++        mMapper = std::make_unique<const Gralloc3Mapper>();
++        if (mMapper->isLoaded()) {
++            mMapperVersion = Version::GRALLOC_3;
++            return;
++        }
++    } else if (atoi(default_mapper) == 2) {
++        mMapper = std::make_unique<const Gralloc2Mapper>();
++        if (mMapper->isLoaded()) {
++            mMapperVersion = Version::GRALLOC_2;
++            return;
++        }
++    } else {
+     mMapper = std::make_unique<const Gralloc4Mapper>();
+     if (mMapper->isLoaded()) {
+         mMapperVersion = Version::GRALLOC_4;
+@@ -67,6 +98,7 @@ GraphicBufferMapper::GraphicBufferMapper() {
+         mMapperVersion = Version::GRALLOC_2;
+         return;
+     }
++    } //debug.ui.default_mapper
+ 
+     LOG_ALWAYS_FATAL("gralloc-mapper is missing");
+ }
+-- 
+2.34.1
+

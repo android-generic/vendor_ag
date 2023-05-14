@@ -1,0 +1,51 @@
+From 94d9d8ba5e4374ca60971a86e543db5b491f8c78 Mon Sep 17 00:00:00 2001
+From: Tanuj Tekriwal <tanuj.tekriwal@intel.com>
+Date: Tue, 6 Oct 2020 09:39:57 +0530
+Subject: [PATCH 2/3] Audio Source Selection
+
+Signed-off-by: kbillore <kaushal.billore@intel.com>
+Change-Id: I21f2ad58e4b450c3a3d2aceb9241544f5ae562ba
+---
+ src/com/android/camera/VideoModule.java | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/com/android/camera/VideoModule.java b/src/com/android/camera/VideoModule.java
+index abbae5265..c299c7d15 100644
+--- a/src/com/android/camera/VideoModule.java
++++ b/src/com/android/camera/VideoModule.java
+@@ -48,6 +48,8 @@ import android.view.KeyEvent;
+ import android.view.View;
+ import android.widget.Toast;
+ 
++import android.media.AudioDeviceInfo;
++
+ import com.android.camera.app.AppController;
+ import com.android.camera.app.CameraAppUI;
+ import com.android.camera.app.LocationManager;
+@@ -1152,6 +1154,23 @@ public class VideoModule extends CameraModule
+ 
+         setRecordLocation();
+ 
++        Context mContext = mActivity.getApplicationContext();
++        AudioManager mAudioManager =
++            (AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE);
++        AudioDeviceInfo[] deviceList =
++            mAudioManager.getDevices(AudioManager.GET_DEVICES_INPUTS);
++        for (AudioDeviceInfo audioDeviceInfo : deviceList) {
++            if (audioDeviceInfo.getType() == AudioDeviceInfo.TYPE_USB_DEVICE) {
++                Log.d(TAG, "Setting preferred device to USB_DEVIVE");
++                mMediaRecorder.setPreferredDevice(audioDeviceInfo);
++                break;
++            } else if (audioDeviceInfo.getType() == AudioDeviceInfo.TYPE_USB_HEADSET) {
++                Log.d(TAG, "Setting preferred device to TYPE_USB_HEADSET");
++                mMediaRecorder.setPreferredDevice(audioDeviceInfo);
++                break;
++            }
++        }
++
+         // Set output file using video Uri.
+         if (mVideoFileDescriptor != null) {
+             mMediaRecorder.setOutputFile(mVideoFileDescriptor.getFileDescriptor());
+-- 
+2.34.1
+

@@ -1,0 +1,32 @@
+From cf5e9c22ee5b0ac1b8d13ffd802ca69c2dafdd67 Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Wed, 18 Jan 2023 08:36:14 -0500
+Subject: [PATCH 38/38] libmodprobe: read blocklist and options from
+ /data/vendor
+
+No need to unpack the system just to edit the files anymore
+---
+ libmodprobe/libmodprobe.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/libmodprobe/libmodprobe.cpp b/libmodprobe/libmodprobe.cpp
+index 431e4fd59..fae5a0cfc 100644
+--- a/libmodprobe/libmodprobe.cpp
++++ b/libmodprobe/libmodprobe.cpp
+@@ -359,11 +359,13 @@ Modprobe::Modprobe(const std::vector<std::string>& base_paths, const std::string
+         ParseCfg(release_base_path + "/modules.options", options_callback);
+         ParseCfg(base_path + "/modules.options", options_callback);
+         ParseCfg("/system/etc/modules.options", options_callback);
++        ParseCfg("/data/vendor/modules.options", options_callback);
+ 
+         auto blocklist_callback = std::bind(&Modprobe::ParseBlocklistCallback, this, _1);
+         ParseCfg(release_base_path + "/modules.blocklist", blocklist_callback);
+         ParseCfg(base_path + "/modules.blocklist", blocklist_callback);
+         ParseCfg("/system/etc/modules.blocklist", blocklist_callback);
++        ParseCfg("/data/vendor/modules.blocklist", blocklist_callback);
+     }
+ 
+     ParseKernelCmdlineOptions();
+-- 
+2.34.1
+

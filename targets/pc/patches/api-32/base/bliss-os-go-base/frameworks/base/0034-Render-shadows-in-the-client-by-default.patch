@@ -1,0 +1,43 @@
+From 516a3f3fa35684119b7c949946c41ba10c84e7c0 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Mon, 29 Aug 2022 01:50:24 +0200
+Subject: [PATCH 34/42] Render shadows in the client by default
+
+We rely on applications drawing their own shadows so that in multi-windows
+mode there is some space to grab their edges for resizing
+
+Change-Id: I775924c2ea84e28c20c29273e613dc1e7391c76d
+---
+ core/java/com/android/internal/policy/PhoneWindow.java          | 2 +-
+ .../core/java/com/android/server/wm/WindowManagerService.java   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/core/java/com/android/internal/policy/PhoneWindow.java b/core/java/com/android/internal/policy/PhoneWindow.java
+index bfc57b403a41..e2776019c65f 100644
+--- a/core/java/com/android/internal/policy/PhoneWindow.java
++++ b/core/java/com/android/internal/policy/PhoneWindow.java
+@@ -352,7 +352,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
+         super(context);
+         mLayoutInflater = LayoutInflater.from(context);
+         mRenderShadowsInCompositor = Settings.Global.getInt(context.getContentResolver(),
+-                DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR, 1) != 0;
++                DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR, 0) != 0;
+     }
+ 
+     /**
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index 1820159d6458..9638bf038057 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -1006,7 +1006,7 @@ public class WindowManagerService extends IWindowManager.Stub
+ 
+     private void setShadowRenderer() {
+         mRenderShadowsInCompositor = Settings.Global.getInt(mContext.getContentResolver(),
+-                DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR, 1) != 0;
++                DEVELOPMENT_RENDER_SHADOWS_IN_COMPOSITOR, 0) != 0;
+     }
+ 
+     PowerManager mPowerManager;
+-- 
+2.34.1
+

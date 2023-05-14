@@ -1,0 +1,33 @@
+From 732066986dfffdc0b92477506a44ef82d75e567b Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Tue, 31 Jan 2023 15:11:47 -0500
+Subject: [PATCH 10/11] Revert "Don't use YV12 color format for video decoding"
+
+This reverts commit f6fd88304e53d306c801be731eb511c8addb375f.
+---
+ media/libstagefright/colorconversion/SoftwareRenderer.cpp | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/media/libstagefright/colorconversion/SoftwareRenderer.cpp b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+index 99753efcba..540c646b00 100644
+--- a/media/libstagefright/colorconversion/SoftwareRenderer.cpp
++++ b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+@@ -130,7 +130,6 @@ void SoftwareRenderer::resetFormatIfChanged(
+     // hardware has YUV12 and RGBA8888 support, so convert known formats
+     {
+         switch (mColorFormat) {
+-#if 0
+             case OMX_COLOR_FormatYUV420Planar:
+             case OMX_COLOR_FormatYUV420SemiPlanar:
+             case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+@@ -147,7 +146,6 @@ void SoftwareRenderer::resetFormatIfChanged(
+                 }
+                 break;
+             }
+-#endif
+             case OMX_COLOR_Format24bitRGB888:
+             {
+                 halFormat = HAL_PIXEL_FORMAT_RGB_888;
+-- 
+2.34.1
+

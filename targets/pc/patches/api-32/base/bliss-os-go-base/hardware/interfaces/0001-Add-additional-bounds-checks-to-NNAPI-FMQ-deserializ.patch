@@ -1,0 +1,212 @@
+From deef9bc712c62f7d63eca653df42961480fc1fde Mon Sep 17 00:00:00 2001
+From: Michael Butler <butlermichael@google.com>
+Date: Thu, 1 Dec 2022 16:42:22 -0800
+Subject: [PATCH 1/8] Add additional bounds checks to NNAPI FMQ deserialize
+ utility functions
+
+This CL adds the following additional bounds checks:
+* Adds additional checks of the index of the std::vector before
+  accessing the element at the index
+* Changes the array index operator [] to the checked std::vector::at
+  method
+
+Bug: 256589724
+Test: mma
+Merged-In: I6bfb02a5cd76258284cc4d797a4508b21e672c4b
+Change-Id: I6bfb02a5cd76258284cc4d797a4508b21e672c4b
+(cherry picked from commit 4668f30dcfdf418e7fcbc0d9c98b2eabbddb5099)
+Merged-In: I6bfb02a5cd76258284cc4d797a4508b21e672c4b
+---
+ .../1.2/utils/src/ExecutionBurstUtils.cpp     | 56 +++++++++++--------
+ 1 file changed, 33 insertions(+), 23 deletions(-)
+
+diff --git a/neuralnetworks/1.2/utils/src/ExecutionBurstUtils.cpp b/neuralnetworks/1.2/utils/src/ExecutionBurstUtils.cpp
+index 1bdde1e71..38710cf3f 100644
+--- a/neuralnetworks/1.2/utils/src/ExecutionBurstUtils.cpp
++++ b/neuralnetworks/1.2/utils/src/ExecutionBurstUtils.cpp
+@@ -192,12 +192,13 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+     size_t index = 0;
+ 
+     // validate packet information
+-    if (data.size() == 0 || data[index].getDiscriminator() != discriminator::packetInformation) {
++    if (index >= data.size() ||
++        data.at(index).getDiscriminator() != discriminator::packetInformation) {
+         return NN_ERROR() << "FMQ Request packet ill-formed";
+     }
+ 
+     // unpackage packet information
+-    const FmqRequestDatum::PacketInformation& packetInfo = data[index].packetInformation();
++    const FmqRequestDatum::PacketInformation& packetInfo = data.at(index).packetInformation();
+     index++;
+     const uint32_t packetSize = packetInfo.packetSize;
+     const uint32_t numberOfInputOperands = packetInfo.numberOfInputOperands;
+@@ -214,13 +215,14 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+     inputs.reserve(numberOfInputOperands);
+     for (size_t operand = 0; operand < numberOfInputOperands; ++operand) {
+         // validate input operand information
+-        if (data[index].getDiscriminator() != discriminator::inputOperandInformation) {
++        if (index >= data.size() ||
++            data.at(index).getDiscriminator() != discriminator::inputOperandInformation) {
+             return NN_ERROR() << "FMQ Request packet ill-formed";
+         }
+ 
+         // unpackage operand information
+         const FmqRequestDatum::OperandInformation& operandInfo =
+-                data[index].inputOperandInformation();
++                data.at(index).inputOperandInformation();
+         index++;
+         const bool hasNoValue = operandInfo.hasNoValue;
+         const V1_0::DataLocation location = operandInfo.location;
+@@ -231,12 +233,13 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+         dimensions.reserve(numberOfDimensions);
+         for (size_t i = 0; i < numberOfDimensions; ++i) {
+             // validate dimension
+-            if (data[index].getDiscriminator() != discriminator::inputOperandDimensionValue) {
++            if (index >= data.size() ||
++                data.at(index).getDiscriminator() != discriminator::inputOperandDimensionValue) {
+                 return NN_ERROR() << "FMQ Request packet ill-formed";
+             }
+ 
+             // unpackage dimension
+-            const uint32_t dimension = data[index].inputOperandDimensionValue();
++            const uint32_t dimension = data.at(index).inputOperandDimensionValue();
+             index++;
+ 
+             // store result
+@@ -253,13 +256,14 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+     outputs.reserve(numberOfOutputOperands);
+     for (size_t operand = 0; operand < numberOfOutputOperands; ++operand) {
+         // validate output operand information
+-        if (data[index].getDiscriminator() != discriminator::outputOperandInformation) {
++        if (index >= data.size() ||
++            data.at(index).getDiscriminator() != discriminator::outputOperandInformation) {
+             return NN_ERROR() << "FMQ Request packet ill-formed";
+         }
+ 
+         // unpackage operand information
+         const FmqRequestDatum::OperandInformation& operandInfo =
+-                data[index].outputOperandInformation();
++                data.at(index).outputOperandInformation();
+         index++;
+         const bool hasNoValue = operandInfo.hasNoValue;
+         const V1_0::DataLocation location = operandInfo.location;
+@@ -270,12 +274,13 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+         dimensions.reserve(numberOfDimensions);
+         for (size_t i = 0; i < numberOfDimensions; ++i) {
+             // validate dimension
+-            if (data[index].getDiscriminator() != discriminator::outputOperandDimensionValue) {
++            if (index >= data.size() ||
++                data.at(index).getDiscriminator() != discriminator::outputOperandDimensionValue) {
+                 return NN_ERROR() << "FMQ Request packet ill-formed";
+             }
+ 
+             // unpackage dimension
+-            const uint32_t dimension = data[index].outputOperandDimensionValue();
++            const uint32_t dimension = data.at(index).outputOperandDimensionValue();
+             index++;
+ 
+             // store result
+@@ -292,12 +297,13 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+     slots.reserve(numberOfPools);
+     for (size_t pool = 0; pool < numberOfPools; ++pool) {
+         // validate input operand information
+-        if (data[index].getDiscriminator() != discriminator::poolIdentifier) {
++        if (index >= data.size() ||
++            data.at(index).getDiscriminator() != discriminator::poolIdentifier) {
+             return NN_ERROR() << "FMQ Request packet ill-formed";
+         }
+ 
+         // unpackage operand information
+-        const int32_t poolId = data[index].poolIdentifier();
++        const int32_t poolId = data.at(index).poolIdentifier();
+         index++;
+ 
+         // store result
+@@ -305,17 +311,17 @@ nn::Result<std::tuple<V1_0::Request, std::vector<int32_t>, V1_2::MeasureTiming>>
+     }
+ 
+     // validate measureTiming
+-    if (data[index].getDiscriminator() != discriminator::measureTiming) {
++    if (index >= data.size() || data.at(index).getDiscriminator() != discriminator::measureTiming) {
+         return NN_ERROR() << "FMQ Request packet ill-formed";
+     }
+ 
+     // unpackage measureTiming
+-    const V1_2::MeasureTiming measure = data[index].measureTiming();
++    const V1_2::MeasureTiming measure = data.at(index).measureTiming();
+     index++;
+ 
+     // validate packet information
+     if (index != packetSize) {
+-        return NN_ERROR() << "FMQ Result packet ill-formed";
++        return NN_ERROR() << "FMQ Request packet ill-formed";
+     }
+ 
+     // return request
+@@ -330,12 +336,13 @@ nn::Result<std::tuple<V1_0::ErrorStatus, std::vector<V1_2::OutputShape>, V1_2::T
+     size_t index = 0;
+ 
+     // validate packet information
+-    if (data.size() == 0 || data[index].getDiscriminator() != discriminator::packetInformation) {
++    if (index >= data.size() ||
++        data.at(index).getDiscriminator() != discriminator::packetInformation) {
+         return NN_ERROR() << "FMQ Result packet ill-formed";
+     }
+ 
+     // unpackage packet information
+-    const FmqResultDatum::PacketInformation& packetInfo = data[index].packetInformation();
++    const FmqResultDatum::PacketInformation& packetInfo = data.at(index).packetInformation();
+     index++;
+     const uint32_t packetSize = packetInfo.packetSize;
+     const V1_0::ErrorStatus errorStatus = packetInfo.errorStatus;
+@@ -351,12 +358,13 @@ nn::Result<std::tuple<V1_0::ErrorStatus, std::vector<V1_2::OutputShape>, V1_2::T
+     outputShapes.reserve(numberOfOperands);
+     for (size_t operand = 0; operand < numberOfOperands; ++operand) {
+         // validate operand information
+-        if (data[index].getDiscriminator() != discriminator::operandInformation) {
++        if (index >= data.size() ||
++            data.at(index).getDiscriminator() != discriminator::operandInformation) {
+             return NN_ERROR() << "FMQ Result packet ill-formed";
+         }
+ 
+         // unpackage operand information
+-        const FmqResultDatum::OperandInformation& operandInfo = data[index].operandInformation();
++        const FmqResultDatum::OperandInformation& operandInfo = data.at(index).operandInformation();
+         index++;
+         const bool isSufficient = operandInfo.isSufficient;
+         const uint32_t numberOfDimensions = operandInfo.numberOfDimensions;
+@@ -366,12 +374,13 @@ nn::Result<std::tuple<V1_0::ErrorStatus, std::vector<V1_2::OutputShape>, V1_2::T
+         dimensions.reserve(numberOfDimensions);
+         for (size_t i = 0; i < numberOfDimensions; ++i) {
+             // validate dimension
+-            if (data[index].getDiscriminator() != discriminator::operandDimensionValue) {
++            if (index >= data.size() ||
++                data.at(index).getDiscriminator() != discriminator::operandDimensionValue) {
+                 return NN_ERROR() << "FMQ Result packet ill-formed";
+             }
+ 
+             // unpackage dimension
+-            const uint32_t dimension = data[index].operandDimensionValue();
++            const uint32_t dimension = data.at(index).operandDimensionValue();
+             index++;
+ 
+             // store result
+@@ -383,12 +392,13 @@ nn::Result<std::tuple<V1_0::ErrorStatus, std::vector<V1_2::OutputShape>, V1_2::T
+     }
+ 
+     // validate execution timing
+-    if (data[index].getDiscriminator() != discriminator::executionTiming) {
++    if (index >= data.size() ||
++        data.at(index).getDiscriminator() != discriminator::executionTiming) {
+         return NN_ERROR() << "FMQ Result packet ill-formed";
+     }
+ 
+     // unpackage execution timing
+-    const V1_2::Timing timing = data[index].executionTiming();
++    const V1_2::Timing timing = data.at(index).executionTiming();
+     index++;
+ 
+     // validate packet information
+-- 
+2.34.1
+

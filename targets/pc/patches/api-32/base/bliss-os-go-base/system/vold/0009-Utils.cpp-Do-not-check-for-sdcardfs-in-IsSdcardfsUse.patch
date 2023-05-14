@@ -1,0 +1,31 @@
+From 0768bc13bd7644a3f7292c3e64f707b3de56d00e Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Sun, 26 Jun 2022 16:16:40 +0700
+Subject: [PATCH] Utils.cpp : Do not check for sdcardfs in IsSdcardfsUsed
+
+In order to return true, IsSdcardfsUsed have 2 conditions : external_storage.sdcardfs.enabled should not be 0 and sdcardfs have to available on /proc/filesystem. The thing is, sdcard command support esdfs bind mounting when ro.sys.sdcardfs set to false. So in order to have it bind mount you will have to compile both sdcardfs and esdfs at the same time.
+
+Remove the sdcardfs check and only use the property to check if sdcardfs is being used. This will help us to use esdfs without having to compile sdcardfs
+
+Change-Id: I474150213b3f35361bc18623d84bfdd83ef704d6
+---
+ Utils.cpp | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/Utils.cpp b/Utils.cpp
+index 6b271d6..ad745e8 100644
+--- a/Utils.cpp
++++ b/Utils.cpp
+@@ -1020,8 +1020,7 @@ bool IsFilesystemSupported(const std::string& fsType) {
+ }
+ 
+ bool IsSdcardfsUsed() {
+-    return IsFilesystemSupported("sdcardfs") &&
+-           base::GetBoolProperty(kExternalStorageSdcardfs, true);
++    return base::GetBoolProperty(kExternalStorageSdcardfs, true);
+ }
+ 
+ status_t WipeBlockDevice(const std::string& path) {
+-- 
+2.34.1
+

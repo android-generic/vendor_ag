@@ -1,0 +1,35 @@
+From 2a2a39b16e4d7829478ec9cbf23ee14c8743df07 Mon Sep 17 00:00:00 2001
+From: Tom Marshall <tdm.code@gmail.com>
+Date: Wed, 6 Sep 2017 17:49:04 +0000
+Subject: [PATCH 04/38] Revert "Format formattable partitions if mount fails"
+
+This reverts commit 29dd6b6c01295222fee5ef2fc70692b2ecb12504.
+
+Change-Id: I7b76cd920019ae8cb7270b3f83e777ea9de7f7a4
+---
+ fs_mgr/fs_mgr_roots.cpp | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/fs_mgr/fs_mgr_roots.cpp b/fs_mgr/fs_mgr_roots.cpp
+index fdaffbeb0..93d3e31e5 100644
+--- a/fs_mgr/fs_mgr_roots.cpp
++++ b/fs_mgr/fs_mgr_roots.cpp
+@@ -119,15 +119,6 @@ bool EnsurePathMounted(Fstab* fstab, const std::string& path, const std::string&
+     }
+ 
+     int result = fs_mgr_do_mount_one(*rec, mount_point);
+-    if (result == -1 && rec->fs_mgr_flags.formattable) {
+-        PERROR << "Failed to mount " << mount_point << "; formatting";
+-        bool crypt_footer = rec->is_encryptable() && rec->key_loc == "footer";
+-        if (fs_mgr_do_format(*rec, crypt_footer) != 0) {
+-            PERROR << "Failed to format " << mount_point;
+-            return false;
+-        }
+-        result = fs_mgr_do_mount_one(*rec, mount_point);
+-    }
+ 
+     if (result == -1) {
+         PERROR << "Failed to mount " << mount_point;
+-- 
+2.34.1
+

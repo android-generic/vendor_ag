@@ -1,0 +1,97 @@
+From 7fbc34670ef4994cfaeaab9010de4ead2ebc1a23 Mon Sep 17 00:00:00 2001
+From: sgnanase <sundar.gnanasekaran@intel.com>
+Date: Wed, 19 Jan 2022 10:35:22 +0530
+Subject: [PATCH 38/42] Aquire wakelock when BluetoothManagerService retries
+ enable BT
+
+com.android.bluetooth process crashes on system resume if power is
+cut to the bluetooth chip during suspend. If system suspends again
+before bluetooth is enabled, the crash repeats, and which will result
+in the subsequent retries to fail. After many suspsed resume cycles
+the retry counter will exceed the maximum limit and BT will remain in
+Off state.
+
+Workaround solution is to acquire wakelock when the service tries to
+restart BT
+
+Change-Id: Ib696f064fc9123350fb7a6093d9a15aaa2a843c6
+Tracked-On: OAM-97107
+Signed-off-by: Aiswarya Cyriac <aiswarya.cyriac@intel.com>
+---
+ .../server/BluetoothManagerService.java        | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/services/core/java/com/android/server/BluetoothManagerService.java b/services/core/java/com/android/server/BluetoothManagerService.java
+index 7ff693cdaa8d..facd102ae8c2 100644
+--- a/services/core/java/com/android/server/BluetoothManagerService.java
++++ b/services/core/java/com/android/server/BluetoothManagerService.java
+@@ -67,6 +67,8 @@ import android.os.Handler;
+ import android.os.IBinder;
+ import android.os.Looper;
+ import android.os.Message;
++import android.os.PowerManager;
++import android.os.PowerManager.WakeLock;
+ import android.os.PowerExemptionManager;
+ import android.os.Process;
+ import android.os.RemoteCallbackList;
+@@ -183,6 +185,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
+     private final ReentrantReadWriteLock mBluetoothLock = new ReentrantReadWriteLock();
+     private boolean mBinding;
+     private boolean mUnbinding;
++    private PowerManager mPowerManager;
++    private WakeLock mPartialWakeLock;
+ 
+     private BluetoothModeChangeHelper mBluetoothModeChangeHelper;
+ 
+@@ -514,7 +518,7 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
+ 
+         mIsHearingAidProfileSupported = context.getResources()
+                 .getBoolean(com.android.internal.R.bool.config_hearing_aid_profile_supported);
+-
++        mPowerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+         // TODO: We need a more generic way to initialize the persist keys of FeatureFlagUtils
+         String value = SystemProperties.get(FeatureFlagUtils.PERSIST_PREFIX + FeatureFlagUtils.HEARING_AID_SETTINGS);
+         if (!TextUtils.isEmpty(value)) {
+@@ -568,6 +572,8 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
+             Slog.w(TAG, "Unable to resolve SystemUI's UID.");
+         }
+         mSystemUiUid = systemUiUid;
++        mPartialWakeLock = mPowerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
++        mPartialWakeLock.setReferenceCounted(false);
+     }
+ 
+     /**
+@@ -2206,6 +2212,9 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
+                             Slog.w(TAG, "bluetooth is recovered from error");
+                             mErrorRecoveryRetryCounter = 0;
+                         }
++                        if (mPartialWakeLock.isHeld()) {
++                            mPartialWakeLock.release();
++                        }
+                     }
+                     break;
+                 }
+@@ -2263,6 +2272,9 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
+                 }
+                 case MESSAGE_RESTART_BLUETOOTH_SERVICE: {
+                     mErrorRecoveryRetryCounter++;
++                    if (!mPartialWakeLock.isHeld()) {
++                        mPartialWakeLock.acquire();
++                    }
+                     Slog.d(TAG, "MESSAGE_RESTART_BLUETOOTH_SERVICE: retry count="
+                             + mErrorRecoveryRetryCounter);
+                     if (mErrorRecoveryRetryCounter < MAX_ERROR_RESTART_RETRIES) {
+@@ -2275,6 +2287,10 @@ class BluetoothManagerService extends IBluetoothManager.Stub {
+                         handleEnable(mQuietEnable);
+                     } else {
+                         Slog.e(TAG, "Reach maximum retry to restart Bluetooth!");
++                        if (mPartialWakeLock.isHeld()) {
++                            Slog.d(TAG,"Releasing the partial wakelock as maximum retry exceeded");
++                            mPartialWakeLock.release();
++                        }
+                     }
+                     break;
+                 }
+-- 
+2.34.1
+

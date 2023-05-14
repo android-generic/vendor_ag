@@ -1,0 +1,41 @@
+From 4d72f156a89021aabde0569815a014e149a7c20a Mon Sep 17 00:00:00 2001
+From: hmtheboy154 <buingoc67@gmail.com>
+Date: Fri, 13 Jan 2023 11:26:56 -0500
+Subject: [PATCH 3/3] Add /vendor/lib{64}/egl search path for non-treblized
+ builds
+
+Required for ANGLE EGL/GLESv2 libraries
+---
+ contents/namespace/sphal.cc         | 2 ++
+ contents/namespace/systemdefault.cc | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/contents/namespace/sphal.cc b/contents/namespace/sphal.cc
+index 5ba2406..ffb9537 100644
+--- a/contents/namespace/sphal.cc
++++ b/contents/namespace/sphal.cc
+@@ -40,6 +40,8 @@ Namespace BuildSphalNamespace([[maybe_unused]] const Context& ctx) {
+   ns.AddSearchPath("/odm/${LIB}");
+   ns.AddSearchPath("/vendor/${LIB}");
+   ns.AddSearchPath("/vendor/${LIB}/egl");
++  ns.AddPermittedPath("/vendor/${LIB}/egl");
++  ns.AddPermittedPath("/system/vendor/${LIB}/egl");
+   ns.AddSearchPath("/vendor/${LIB}/hw");
+ 
+   ns.AddPermittedPath("/odm/${LIB}");
+diff --git a/contents/namespace/systemdefault.cc b/contents/namespace/systemdefault.cc
+index 25f9a88..a8edb97 100644
+--- a/contents/namespace/systemdefault.cc
++++ b/contents/namespace/systemdefault.cc
+@@ -108,6 +108,8 @@ Namespace BuildSystemDefaultNamespace([[maybe_unused]] const Context& ctx) {
+     ns.AddSearchPath("/vendor/${LIB}");
+     ns.AddSearchPath("/vendor/${LIB}/arm");
+     ns.AddSearchPath("/vendor/${LIB}/arm/nb");
++    ns.AddSearchPath("/system/vendor/${LIB}/egl");
++    ns.AddSearchPath("/vendor/${LIB}/egl");
+     ns.AddSearchPath("/vendor/${LIB}/hw");
+     ns.AddSearchPath("/odm/${LIB}");
+   }
+-- 
+2.34.1
+

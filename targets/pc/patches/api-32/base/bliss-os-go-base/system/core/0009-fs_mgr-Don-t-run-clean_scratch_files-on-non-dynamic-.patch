@@ -1,0 +1,26 @@
+From a2b5e6a50e98bf16bd81ec57bfb40e8746f97a60 Mon Sep 17 00:00:00 2001
+From: Nolen Johnson <johnsonnolen@gmail.com>
+Date: Thu, 6 Jan 2022 16:59:08 -0500
+Subject: [PATCH 09/38] fs_mgr: Don't run clean_scratch_files on non-dynamic
+ devices
+
+* This results in a metric ton of denials on some devices and
+  eats up valuable resources on boot, plus there's 0 need for it,
+  so kill it.
+
+Change-Id: Ic52d5b3f06724430e9505345024cf0041b37ca49
+---
+ fs_mgr/clean_scratch_files.rc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/fs_mgr/clean_scratch_files.rc b/fs_mgr/clean_scratch_files.rc
+index 25a7e690a..71708f8c1 100644
+--- a/fs_mgr/clean_scratch_files.rc
++++ b/fs_mgr/clean_scratch_files.rc
+@@ -1,2 +1,2 @@
+-on post-fs-data && property:ro.debuggable=1
++on post-fs-data && property:ro.debuggable=1 && property:ro.boot.dynamic_partitions=true
+     exec_background - root root -- /system/bin/clean_scratch_files
+-- 
+2.34.1
+

@@ -1,0 +1,40 @@
+From 5baae12cc19def31e660c444277b67cff17b6412 Mon Sep 17 00:00:00 2001
+From: Chih-Wei Huang <cwhuang@linux.org.tw>
+Date: Thu, 18 Oct 2018 15:47:19 +0800
+Subject: [PATCH 17/42] pm: ignore restorecon failure
+
+On the 9p filesystem, restorecon won't work. It causes apk can't be
+installed. Just ignore the errors to workaround it.
+---
+ .../java/com/android/server/pm/PackageInstallerService.java     | 2 +-
+ .../core/java/com/android/server/pm/PackageManagerService.java  | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/services/core/java/com/android/server/pm/PackageInstallerService.java b/services/core/java/com/android/server/pm/PackageInstallerService.java
+index 708b2129ad29..0ce62be76813 100644
+--- a/services/core/java/com/android/server/pm/PackageInstallerService.java
++++ b/services/core/java/com/android/server/pm/PackageInstallerService.java
+@@ -965,7 +965,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
+         }
+ 
+         if (!SELinux.restorecon(stageDir)) {
+-            throw new IOException("Failed to restorecon session dir: " + stageDir);
++            Slog.e(TAG, "Failed to restorecon session dir: " + stageDir);
+         }
+     }
+ 
+diff --git a/services/core/java/com/android/server/pm/PackageManagerService.java b/services/core/java/com/android/server/pm/PackageManagerService.java
+index 6db8bc6b825f..24512bf40cd4 100644
+--- a/services/core/java/com/android/server/pm/PackageManagerService.java
++++ b/services/core/java/com/android/server/pm/PackageManagerService.java
+@@ -18902,7 +18902,6 @@ public class PackageManagerService extends IPackageManager.Stub
+ 
+             if (!onIncremental && !SELinux.restoreconRecursive(afterCodeFile)) {
+                 Slog.w(TAG, "Failed to restorecon");
+-                return false;
+             }
+ 
+             // Reflect the rename internally
+-- 
+2.34.1
+

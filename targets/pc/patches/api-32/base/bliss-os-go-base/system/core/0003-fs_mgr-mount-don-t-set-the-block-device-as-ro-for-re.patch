@@ -1,0 +1,51 @@
+From fcda3ec1ecf15f2e0930bfeabfc8820a582ee8a1 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Sun, 6 Oct 2019 23:52:16 +0200
+Subject: [PATCH 03/38] fs_mgr: mount: don't set the block device as ro for
+ recovery
+
+ * In recovery we need to be able to edit the block device
+   after it's been mounted.
+   This allows, for example, to wipe system after mounting it
+
+Change-Id: Ie536d275643e9d6063bba789e4cd2fa2671fc8fa
+---
+ fs_mgr/Android.bp | 5 +++++
+ fs_mgr/fs_mgr.cpp | 2 ++
+ 2 files changed, 7 insertions(+)
+
+diff --git a/fs_mgr/Android.bp b/fs_mgr/Android.bp
+index 3c83aabba..679bb40e4 100644
+--- a/fs_mgr/Android.bp
++++ b/fs_mgr/Android.bp
+@@ -149,6 +149,11 @@ cc_library {
+     srcs: [
+         ":libfiemap_passthrough_srcs",
+     ],
++    target: {
++        recovery: {
++            cflags: ["-DSKIP_SET_BLK_RO"],
++        },
++    },
+ }
+ 
+ cc_library {
+diff --git a/fs_mgr/fs_mgr.cpp b/fs_mgr/fs_mgr.cpp
+index 8896ec33c..2b3ffdf7a 100644
+--- a/fs_mgr/fs_mgr.cpp
++++ b/fs_mgr/fs_mgr.cpp
+@@ -831,9 +831,11 @@ static int __mount(const std::string& source, const std::string& target, const F
+     }
+     PINFO << __FUNCTION__ << "(source=" << source << source_missing << ",target=" << target
+           << target_missing << ",type=" << entry.fs_type << ")=" << ret;
++#ifndef SKIP_SET_BLK_RO
+     if ((ret == 0) && (mountflags & MS_RDONLY) != 0) {
+         fs_mgr_set_blk_ro(source);
+     }
++#endif
+     android::base::SetProperty("ro.boottime.init.mount." + Basename(target),
+                                std::to_string(t.duration().count()));
+     errno = save_errno;
+-- 
+2.34.1
+

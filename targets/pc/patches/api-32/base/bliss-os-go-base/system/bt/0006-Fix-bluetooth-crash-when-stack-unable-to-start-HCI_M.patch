@@ -1,0 +1,117 @@
+From 522d81a7d2c7949366af47744a1813efdcf90d51 Mon Sep 17 00:00:00 2001
+From: Aiswarya Cyriac <aiswarya.cyriac@intel.com>
+Date: Wed, 15 Sep 2021 17:01:40 +0530
+Subject: [PATCH 6/7] Fix bluetooth crash when stack unable to start HCI_MODULE
+
+When BT is in host controlled mode for CIV, if user tries
+to turn ON, Bluetooth crashes continously. Added fix in
+stack to gracefully shutdown HCI_MODULE if it is unable to
+start it.
+
+Change-Id: Id497071f0a3f4513be4663ba0403a101e81421ce
+Tracked-On:
+Signed-off-by: Aiswarya Cyriac <aiswarya.cyriac@intel.com>
+---
+ btcore/src/module.cc         |  3 +--
+ btif/src/stack_manager.cc    | 11 ++++++++++-
+ hci/src/hci_layer.cc         | 12 +++++++++++-
+ hci/src/hci_layer_android.cc |  7 ++++++-
+ 4 files changed, 28 insertions(+), 5 deletions(-)
+
+diff --git a/btcore/src/module.cc b/btcore/src/module.cc
+index aba223422..53dfc4f29 100644
+--- a/btcore/src/module.cc
++++ b/btcore/src/module.cc
+@@ -99,8 +99,7 @@ void module_shut_down(const module_t* module) {
+   CHECK(state <= MODULE_STATE_STARTED);
+ 
+   // Only something to do if the module was actually started
+-  if (state < MODULE_STATE_STARTED) return;
+-
++  if (state < MODULE_STATE_STARTED && strcmp(module->name, "hci_module")) return;
+   LOG_INFO("%s Shutting down module \"%s\"", __func__, module->name);
+   if (!call_lifecycle_function(module->shut_down)) {
+     LOG_ERROR("%s Failed to shutdown module \"%s\". Continuing anyway.",
+diff --git a/btif/src/stack_manager.cc b/btif/src/stack_manager.cc
+index e1b142ee6..2536c1351 100644
+--- a/btif/src/stack_manager.cc
++++ b/btif/src/stack_manager.cc
+@@ -262,10 +262,19 @@ static void event_start_up_stack(UNUSED_ATTR void* context) {
+     module_shut_down(get_local_module(GD_IDLE_MODULE));
+     module_start_up(get_local_module(GD_SHIM_MODULE));
+     module_start_up(get_local_module(BTIF_CONFIG_MODULE));
++
+   } else {
++    bool ret = false;
+     module_start_up(get_local_module(BTIF_CONFIG_MODULE));
+     module_start_up(get_local_module(BTSNOOP_MODULE));
+-    module_start_up(get_local_module(HCI_MODULE));
++    ret = module_start_up(get_module(HCI_MODULE));
++    if (!ret) {
++      APPL_TRACE_DEBUG("%s: failed to start hci module",__func__);
++      module_shut_down(get_module(HCI_MODULE));
++      module_shut_down(get_module(BTSNOOP_MODULE));
++      module_shut_down(get_module(BTIF_CONFIG_MODULE));
++      return;
++    }
+   }
+ 
+   get_btm_client_interface().lifecycle.btm_init();
+diff --git a/hci/src/hci_layer.cc b/hci/src/hci_layer.cc
+index 1eb34274f..0d38f878f 100644
+--- a/hci/src/hci_layer.cc
++++ b/hci/src/hci_layer.cc
+@@ -157,6 +157,11 @@ void initialization_complete() {
+   hci_thread.DoInThread(FROM_HERE, base::Bind(&event_finish_startup, nullptr));
+ }
+ 
++void initialization_failure() {
++  static char fail = 'F';
++  hci_thread.DoInThread(FROM_HERE, base::Bind(&event_finish_startup, (void*) &fail));
++}
++
+ void hci_event_received(const base::Location& from_here, BT_HDR* packet) {
+   btsnoop->capture(packet, true);
+ 
+@@ -371,7 +376,12 @@ static void event_finish_startup(UNUSED_ATTR void* context) {
+   if (!startup_future) {
+     return;
+   }
+-  future_ready(startup_future, FUTURE_SUCCESS);
++  if ((char*) context == nullptr)
++    future_ready(startup_future, FUTURE_SUCCESS);
++  else
++    future_ready(startup_future, FUTURE_FAIL);
++
++
+   startup_future = NULL;
+ }
+ 
+diff --git a/hci/src/hci_layer_android.cc b/hci/src/hci_layer_android.cc
+index bba7834cd..5b4950a5e 100644
+--- a/hci/src/hci_layer_android.cc
++++ b/hci/src/hci_layer_android.cc
+@@ -53,6 +53,7 @@ using ::bluetooth::common::StopWatchLegacy;
+ using namespace ::android::hardware::bluetooth;
+ 
+ extern void initialization_complete();
++extern void initialization_failure();
+ extern void hci_event_received(const base::Location& from_here, BT_HDR* packet);
+ extern void acl_event_received(BT_HDR* packet);
+ extern void sco_data_received(BT_HDR* packet);
+@@ -120,7 +121,11 @@ class BluetoothHciCallbacks : public V1_1::IBluetoothHciCallbacks {
+       return Void();
+     }
+     CHECK(status == Status::SUCCESS);
+-    initialization_complete();
++    if (status == Status::SUCCESS)
++      initialization_complete();
++    else
++      initialization_failure();
++
+     return Void();
+   }
+ 
+-- 
+2.34.1
+

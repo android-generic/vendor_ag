@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+
+ <!-- Remove Packages -->
+
+	<remove-project name="platform/prebuilts/build-tools" />
+	<remove-project name="platform/prebuilts/gcc/darwin-x86/x86/x86_64-linux-android-4.9" />
+	<remove-project name="platform/prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9" />
+
+<!-- LineageOS Additions -->
+  
+  <!-- Prebuilts -->
+  <project path="prebuilts/build-tools" name="LineageOS/android_prebuilts_build-tools" remote="ghub" groups="pdk" clone-depth="10" revision="lineage-19.1" />
+  <project path="prebuilts/extract-tools" name="LineageOS/android_prebuilts_extract-tools" clone-depth="10" remote="ghub" revision="lineage-19.1" />
+  <project path="prebuilts/tools-lineage" name="LineageOS/android_prebuilts_tools-lineage" clone-depth="10" remote="ghub" revision="lineage-19.1" />
+  <project path="prebuilts/gcc/darwin-x86/x86/x86_64-linux-android-4.9" name="LineageOS/android_prebuilts_gcc_darwin-x86_x86_x86_64-linux-android-4.9" remote="ghub" groups="pdk,darwin,x86" clone-depth="1" revision="lineage-19.1" />
+  <project path="prebuilts/gcc/linux-x86/x86/x86_64-linux-android-4.9" name="LineageOS/android_prebuilts_gcc_linux-x86_x86_x86_64-linux-android-4.9" remote="ghub" groups="pdk,linux,x86" clone-depth="1" revision="lineage-19.1" />
+  <project path="tools/extract-utils" name="LineageOS/android_tools_extract-utils" remote="ghub" revision="lineage-19.1" />
+
+</manifest>

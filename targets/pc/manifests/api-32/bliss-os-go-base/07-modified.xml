@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+	<!-- We need to pull patches for each of these still -->
+	<!-- 
+	0 <project path="manifest" name="manifest" remote="BR-x86" revision="arcadia-x86" />	
+	0 
+	* 
+	* <project path="build/make" name="platform_build" remote="BR-x86" revision="arcadia-x86" >
+		<copyfile src="core/root.mk" dest="Makefile" />
+		<linkfile src="CleanSpec.mk" dest="build/CleanSpec.mk" />
+		<linkfile src="buildspec.mk.default" dest="build/buildspec.mk.default" />
+		<linkfile src="core" dest="build/core" />
+		<linkfile src="envsetup.sh" dest="build/envsetup.sh" />
+		<linkfile src="target" dest="build/target" />
+		<linkfile src="tools" dest="build/tools" />
+		</project>
+	* <project path="build/soong" name="platform_build_soong" remote="BR-x86" revision="arcadia-x86" >
+	* <project path="development" name="platform_development" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="bootable/recovery" name="platform_bootable_recovery" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="frameworks/av" name="frameworks_av" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="frameworks/base" name="platform_frameworks_base" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="frameworks/native" name="frameworks_native" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="hardware/interfaces" name="platform_hardware_interfaces" remote="BR-x86" revision="arcadia-x86" />
+	0 <project path="packages/apps/Blissify" name="platform_packages_apps_Blissify" remote="BR-x86" revision="arcadia-x86" />  
+	0? <project path="packages/apps/Settings" name="packages_apps_Settings" remote="BR-x86" revision="arcadia-x86" />
+	0 <project path="packages/modules/Wifi" name="platform_packages_modules_Wifi" remote="BR-x86" revision="arcadia-next" />
+	* <project path="system/core" name="platform_system_core" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="system/bt" name="platform_system_bt" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="system/linkerconfig" name="android_system_linkerconfig" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="system/vold" name="platform_system_vold" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="system/hardware/interfaces" name="platform_system_hardware_interfaces" remote="BR-x86" revision="arcadia-x86" />
+	* <project path="toolchain/pgo-profiles" name="platform_toolchain_pgo-profiles" remote="BR-x86" revision="arcadia-x86" />
+	0 
+	0 * <project path="packages/apps/Camera2" name="BlissRoms-x86/platform_packages_apps_Camera2" remote="ghub" revision="arcadia-x86" />
+	-->
+	<project path="art" name="platform_art" remote="BR-x86" revision="arcadia-x86" />
+	<project path="bionic" name="platform_bionic" remote="BR-x86" revision="arcadia-x86" />
+	<project path="vendor/bliss" name="platform_vendor_bliss" remote="BR-x86" revision="arcadia-x86" />
+	<project path="vendor/overlays" name="platform_vendor_overlays" remote="BR-x86" revision="arcadia-x86-go" />
+	<project path="external/mksh" name="android_external_mksh" remote="sg" revision="lineage/12l-x86" />
+
+</manifest>

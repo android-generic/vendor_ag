@@ -1,0 +1,27 @@
+From ccc29523377856a4e77bd982bbc333667b1cd5b8 Mon Sep 17 00:00:00 2001
+From: Alessandro Astone <ales.astone@gmail.com>
+Date: Wed, 26 Feb 2020 17:30:50 +0100
+Subject: [PATCH 06/38] reboot: allow opting-in to fastbootd
+
+Change-Id: Iaf5eb813e848ef05b1b455ebfe3643f4a8b4f80d
+---
+ init/reboot.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/init/reboot.cpp b/init/reboot.cpp
+index a0ae4b4d4..0e59ae036 100644
+--- a/init/reboot.cpp
++++ b/init/reboot.cpp
+@@ -1004,7 +1004,8 @@ void HandlePowerctlMessage(const std::string& command) {
+             // adb reboot fastboot should boot into bootloader for devices not
+             // supporting logical partitions.
+             if (reboot_target == "fastboot" &&
+-                !android::base::GetBoolProperty("ro.boot.dynamic_partitions", false)) {
++                !android::base::GetBoolProperty("ro.boot.dynamic_partitions", false) &&
++                !android::base::GetBoolProperty("ro.fastbootd.available", false)) {
+                 reboot_target = "bootloader";
+             }
+             // When rebooting to the bootloader notify the bootloader writing
+-- 
+2.34.1
+
