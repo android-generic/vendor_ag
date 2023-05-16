@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 SCRIPT_PATH=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 # rompath="$(dirname "$SCRIPT_PATH")"
