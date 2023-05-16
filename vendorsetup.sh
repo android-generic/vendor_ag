@@ -33,28 +33,12 @@ function apply-x86-kernel-patches()
 
 function ag-menu()
 {
-	if [ "$1" == "" ]; then
-		echo -e "You must specify a target type (pc, gsi, emu)"
-	elif [ "$1" == "gsi" ]; then
-		echo -e "You must wait for that target type to become available. Check repo for updates"
-	elif [ "$1" == "emu" ]; then
-		echo -e "You must wait for that target type to become available. Check repo for updates"
-	else
-		bash vendor/${ag_vendor_path}/ag-core/ag-menu.sh $1 $2 $3 $4
-	fi
+	bash vendor/${ag_vendor_path}/ag-menu-new.sh $1 $2 $3 $4
 }
 
 function ag-menu-l()
 {
-	if [ "$1" == "" ]; then
-		echo -e "You must specify a target type (pc, gsi, emu)"
-	elif [ "$1" == "gsi" ]; then
-		echo -e "You must wait for that target type to become available. Check repo for updates"
-	elif [ "$1" == "emu" ]; then
-		echo -e "You must wait for that target type to become available. Check repo for updates"
-	else
-		. vendor/${ag_vendor_path}/ag-core/ag-menu.sh $1 $2 $3 $4
-	fi
+	. vendor/${ag_vendor_path}/ag-menu-new.sh $1 $2 $3 $4
 }
 
 function manifest-backup
