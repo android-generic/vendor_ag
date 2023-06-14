@@ -8,7 +8,7 @@ modulepath="$rompath/vendor/$vendor_path/scripts"
 privmodulepath="$rompath/vendor/$vendor_path/private-scripts"
 export supertitle="Android Generic Project - Gearlock Options"
 export supericon="$rompath/vendor/$vendor_path/ag-core/includes/ag-logo.png"
-source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+source $rompath/vendor/$vendor_path/core-menu/includes/easybashgui
 
 #setup colors
 red=`tput setaf 1`

@@ -17,9 +17,9 @@
 
 top_dir=`pwd`
 popt=0
-# source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+# source $rompath/vendor/$vendor_path/core-menu/includes/easybashgui
 source $ag_vendor_path/core-menu/includes/easybashgui
-# include $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+# include $rompath/vendor/$vendor_path/core-menu/includes/easybashgui
 
 if [[ "$ag_debug" == "true" ]]; then
 echo -e "SCRIPT_PATH: $SCRIPT_PATH"

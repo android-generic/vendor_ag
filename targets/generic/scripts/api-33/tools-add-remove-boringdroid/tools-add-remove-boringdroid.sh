@@ -11,7 +11,7 @@ private_utils_dir="$rompath/vendor/$vendor_path/PRIVATE/utils"
 private_patch_dir="$private_utils_dir/android_r/google_diff/$TARGET_PRODUCT"
 export supertitle="Android Generic Project - Boringdroid Options"
 export supericon="$rompath/vendor/$vendor_path/ag-core/includes/ag-logo.png"
-source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+source $rompath/vendor/$vendor_path/core-menu/includes/easybashgui
 
 #setup colors
 red=`tput setaf 1`

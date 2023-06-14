@@ -17,7 +17,7 @@ mkdir -p $ag_temp_path
 targetspath="$ag_vendor_path/targets"
 export targetspath="$ag_vendor_path/targets"
 
-# source $rompath/vendor/$ag_vendor_path/ag-core/gui/easybashgui
+# source $rompath/vendor/$ag_vendor_path/core-menu/includes/easybashgui
 export supericon="$ag_vendor_path/assets/ag-logo.png"
 
 export PATH="$ag_vendor_path/core-menu/includes/:$PATH"

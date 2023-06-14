@@ -10,8 +10,8 @@ vendor_path="ag"
 temp_path="$rompath/vendor/$vendor_path/tmp/"
 config_type="$1"
 popt=0
-source $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
-#~ include $rompath/vendor/$vendor_path/ag-core/gui/easybashgui
+source $rompath/vendor/$vendor_path/core-menu/includes/easybashgui
+#~ include $rompath/vendor/$vendor_path/core-menu/includes/easybashgui
 
 #setup colors
 red=`tput setaf 1`

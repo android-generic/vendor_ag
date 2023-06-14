@@ -8,7 +8,7 @@ config_type_modulepath="$rompath/vendor/$ag_vendor_path/$1_scripts"
 privmodulepath="$rompath/vendor/$ag_vendor_path/private-scripts"
 export supertitle="Android Generic Project - Main Menu"
 export supericon="$rompath/vendor/$ag_vendor_path/ag-core/includes/ag-logo.png"
-source $rompath/vendor/$ag_vendor_path/ag-core/gui/easybashgui
+source $rompath/vendor/$ag_vendor_path/core-menu/includes/easybashgui
 
 #setup colors
 red=`tput setaf 1`
