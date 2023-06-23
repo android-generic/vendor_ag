@@ -9,7 +9,7 @@ The Community Edition includes all of the following addons:
 * GPL addons
 * Targets for Android Generic
 
-## Startup Edition
+## Startup Edition (coming soon)
 
 The Startup Edition of the vendor_ag project is a paid subscription service that costs $50/month (per server). The Startup Edition includes all of the features of the Community Edition, plus the following private addons:
 
@@ -18,7 +18,7 @@ The Startup Edition of the vendor_ag project is a paid subscription service that
 * Recents Customization addon
 * Kiosk mode customization addon
 
-## Professional Edition
+## Professional Edition (coming soon)
 
 The Professional Edition of the vendor_ag project is a paid subscription service that costs $100/month (per server). The Professional Edition includes all of the features of the Startup Edition, plus the following private addons:
 
