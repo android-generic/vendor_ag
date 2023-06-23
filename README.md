@@ -69,17 +69,6 @@ Telegram:
 
 ### Resources:
 
-AG Artwork:  
-[Android-Generic Artwork](https://github.com/android-generic/artwork)
-
-AG Documentation:
-[Android-Generic Project Documentation](https://android-generic-project.gitbook.io/documentation/)
-
-Source & Troubleshooting Documentation:  
-[Android-x86 Documentation](https://www.android-x86.org/documentation.html)
-
-[Bliss OS Docs](https://docs.blissos.org)
-
 [**LICENSING**](LICENSING.md)
 
 [**OPEN_SOURCE LICENSE**](LICENSE.md)
@@ -87,14 +76,18 @@ Source & Troubleshooting Documentation:
 [**CONTRIBUTING**](CONTRIBUTING.md)
 
 [**CODE OF CONDUCT**](CODE_OF_CONDUCT.md)
+ 
+[**Android-Generic Artwork**](https://github.com/android-generic/artwork)
 
 ## Documentation:
 
-Our documentation has moved to it's own repo:
-[AG Documentation Repo](https://github.com/android-generic/documentation)
+[**AG Documentation Repo**](https://github.com/android-generic/documentation)
 
-[Android-Generic Project Documentation Site](https://android-generic-project.gitbook.io/documentation/)
+[**Android-Generic Project Documentation**](https://android-generic-project.gitbook.io/documentation/)
 
+[**Android-x86 Documentation**](https://www.android-x86.org/documentation.html)
+
+[**Bliss OS Documentation**](https://docs.blissos.org)
 
 # Credits
 
