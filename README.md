@@ -80,9 +80,12 @@ Source & Troubleshooting Documentation:
 
 [Bliss OS Docs](https://docs.blissos.org)
 
-[**LICENSING**](LINCENSING.md)
+[**LICENSING**](LICENSING.md)
+
 [**OPEN_SOURCE LICENSE**](LICENSE.md)
+
 [**CONTRIBUTING**](CONTRIBUTING.md)
+
 [**CODE OF CONDUCT**](CODE_OF_CONDUCT.md)
 
 ## Documentation:
