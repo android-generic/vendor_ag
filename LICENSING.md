@@ -2,7 +2,7 @@
 
 ## Community Edition
 
-The Community Edition of the vendor_ag project is free and open source software, licensed under the GPLv3. This means that you can use, modify, and redistribute the software for any purpose, as long as you keep the copyright and license notices intact.
+The Community Edition of the vendor_ag project is free and open source software, licensed under the APACHE v2.0. This means that you can use, modify, and redistribute the software for any purpose, as long as you keep the copyright and license notices intact.
 
 The Community Edition includes all of the following addons:
 
